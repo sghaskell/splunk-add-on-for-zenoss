@@ -1,0 +1,83 @@
+<dashboard>
+  <label>Documentation</label>
+  <row>
+    <panel>
+      <html>
+          <h1>Requirments</h1>
+          <p>This TA requires Python. It can be installed on a search head, heavy forwarder or light forwarder. The TA will not work on a universal forwarder due to the Python dependency. If installed on a search head in a distributed environment make sure you are forwarding data from your search head to your indexers.</p>
+          <p><a href="http://docs.splunk.com/Documentation/Splunk/6.2.3/DistSearch/Forwardsearchheaddata" target="_blank">http://docs.splunk.com/Documentation/Splunk/6.2.3/DistSearch/Forwardsearchheaddata</a></p>
+        
+          <h1>Install Instructions</h1>
+          <p>Extract in <b>$SPLUNK_HOME/etc/apps</b> or install via the UI.</p>
+
+          <h1>Configure Modular Input</h1>
+          <p><b>Settings -> Data inputs -> Zenoss</b></p>
+          <pre>
+Username: zenoss username
+password: zenoss password
+Zenoss Web Interface: Web interface to Zenoss server; e.g. http://zenoss-server:8080
+Device Name (Optional): Filter to only pull from a specific device. Defaults to all devices
+Timezone (Optional): Timezone of Zenoss server - see http://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+Archive Threshold - Zenoss 'Event Archive Threshold (minutes)' setting. Interval to read archive table. Leave blank for Zenoss default of 4320.
+Event Checkpoint Removal - Zenoss 'Delete Archived Events Older Than (days)' setting. Used to keep checkpoint file clean. Leave blank for Zenoss default of 90.
+Start Date (Optional): Specify a starting date to pull events from or leave blank for ALL events. Ex: 2015-03-16T00:00:00
+Index Closed Events (Optional): Index eventState "Closed"
+Index Cleared Events (Optional): Index eventState "Cleared"
+Index Archived Events (Optional): Index events form the Archive table
+Index Suppressed Events (Optional): Index eventState "Suppressed"            
+Index Repeat Events (Optional): Index repeat events. Index an event every time the count increments for an evid. This will result in the same event getting indexed with a new latestTime timestamp. This is useful for fine grained analytics on events. This setting could lead to an increase in indexing volume depending on your environment.            
+Sourcetype - Set to Manual and leave blank to set to 'zenoss-events'
+            
+More Settings
+Interval - Defaults to 60 seconds
+Host - specify zenoss hostname
+Index - specify zenoss index
+          </pre>
+
+        <h1>Configuring Event Creation Alert Script</h1>
+        
+        <p>1) Create <b>$SPLUNK_HOME/etc/apps/TA-zenoss/local/zenoss_servers.conf</b> or copy <b>$SPLUNK_HOME/etc/apps/TA-zenoss/local/zenoss_servers.conf</b></p>
+
+        <p>Copy or modify the example stanza and update with your Zenoss server specifics</p>
+
+		<pre>
+# Example
+[<font color="red">zenoss</font>]
+username = admin
+password = mysecurepassword 
+web_address = http://zenoss:8080
+        </pre>
+        
+        <p>The password will get hashed the first time an alert is triggered.</p>
+
+        <p>2) Edit <b>$SPLUNK_HOME/etc/apps/TA-zenoss/bin/scripts/zenoss_create_event.sh</b> and <font color="red">update the script with the stanza from the previous step</font>. In this example '<font color="red">zenoss</font>'.</p>
+
+      	<pre>
+ZENOSS_SERVER_STANZA=<font color="red">zenoss</font>
+        </pre>
+        
+        <p>3) Create a saved search that meets your criteria for creating an event. The alert script requires <b>field/table</b> output with the following <b><font color="blue">names</font></b> (<font color="red">case sensitive</font>):</p>
+	    <pre>
+<font color="blue">device</font> OR <font color="blue">host</font> (REQUIRED) - device/host name
+<font color="blue">severity</font> (REQUIRED) - severity of alert - "<font color="red">Critical</font>" OR "<font color="red">Error</font>" OR "<font color="red">Warning</font>" OR "<font color="red">Info</font>" OR "<font color="red">Debug</font>" OR "<font color="red">Clear</font>"
+<font color="blue">summary</font> (REQUIRED) - Plain text summary of the event
+<font color="blue">component</font> (OPTIONAL) - Component name
+<font color="blue">evclass</font> (OPTIONAL) - Event class name
+<font color="blue">evclasskey</font> (OPTIONAL) - Event class key
+        </pre>
+          <h3>example search</h3>
+          <pre>
+index=oidemo sourcetype=access_combined | stats count(eval(status="404")) as web_error by host | eval severity=case(web_error > 100 AND web_error &lt; 500, "Warning", web_error > 500 AND web_error &lt; 1000, "Error", web_error > 1000, "Critical") | eval summary="Web 404 Error - greater than 1000 errors" | eval evclass="/Status/Web" | table host, severity, summary, evclass
+          </pre>
+
+        <p>4) Save the search as an Alert and schedule it to run per your desired frequency. Under 'Enable Actions' check 'Run a Script'. In the 'Filename' field enter 'zenoss_create_event.sh'. An event for each row in the table will be generated in Zenoss when the alert is triggered.</p>
+
+        <h1>Data Model</h1>
+        <p>The app ships with a Data Model that comes unaccelerated out of the box. To acclerate the data model go to <b>'Settings -> Data models'</b>. Under <b>'Actions'</b> for the <b>Events</b> data model, select <b>'Edit -> Edit Acceleration'</b> and select the summary range that fits your needs.</p>
+ 
+        <h1>CIM Compliant</h1>
+        <p>This app is CIM compliant and maps to the <a href="http://docs.splunk.com/Documentation/CIM/latest/User/Alerts" target="_blank">Alerts data model</a>.</p>
+       </html>
+    </panel>
+  </row>
+</dashboard>

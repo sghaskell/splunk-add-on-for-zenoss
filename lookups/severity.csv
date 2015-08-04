@@ -1,0 +1,7 @@
+severity_id,vendor_severity,severity,type,dest
+0,clear,,alert,zenoss
+1,debug,,alert,zenoss
+2,info,informational,alert,zenoss
+3,warning,medium,alert,zenoss
+4,error,high,alert,zenoss
+5,critical,critical,alert,zenoss
