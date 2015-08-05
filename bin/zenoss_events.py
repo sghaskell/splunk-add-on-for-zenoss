@@ -3,7 +3,6 @@ import os
 from splunklib.modularinput import *
 from zenoss_api import ZenossAPI
 from pprint import pprint
-import logging
 import xml.dom.minidom, xml.sax.saxutils
 import re
 import time
@@ -16,15 +15,6 @@ from tzlocal import get_localzone
 import time
 import calendar
 
-#set up logging
-logging.root.setLevel(logging.ERROR)
-#logging.root.setLevel(logging.DEBUG)
-formatter = logging.Formatter('%(levelname)s %(message)s')
-#with zero args , should go to STD ERR
-handler = logging.StreamHandler()
-handler.setFormatter(formatter)
-logging.root.addHandler(handler)
-
 # Date format for Zenoss API
 DATE_FORMAT = "%Y-%m-%dT%H:%M:%S"
 
@@ -35,13 +25,15 @@ CHECKPOINT_CLEAN_FREQUENCY = 1
 DAY = 86400
 HOUR = 60
 
-
 # Checkpoint file class
+# params:
+#  checkpoint_dir - directory where modinput writes checkpoint files
+#  name - name of input to checkpoint
+#  ew - EventWriter object for logging
 class Checkpointer:
-    def __init__(self, checkpoint_dir, name):
-        #m = re.search(r'\/\/(.*)$', name)
-        #self.checkpoint_file_name = "%s/%s.pgz" % (checkpoint_dir, m.group(1))
+    def __init__(self, checkpoint_dir, name, ew):
         self.checkpoint_file_name = "%s/%s.pgz" % (checkpoint_dir, name)
+        self.ew = ew
 
     @property
     # Method to load checkpoint file
@@ -55,7 +47,8 @@ class Checkpointer:
             f.close()
             return checkpoint_pickle
         except Exception, e:
-            logging.error("Error reading checkpoint pickle file '%s': %s" % (self.checkpoint_file_name, e))
+            log_message = "Error reading checkpoint pickle file '%s': %s" % (self.checkpoint_file_name, e)
+            self.ew.write("ERROR", log_message)
             return {}
 
     # Method to open checkpoint file
@@ -67,7 +60,8 @@ class Checkpointer:
             f = gzip.open(self.checkpoint_file_name, mode)
             return f
         except Exception, e:
-            logging.error("Error opening '%s': %s" % (self.checkpoint_file_name, e))
+            log_message = "Error opening '%s': %s" % (self.checkpoint_file_name, e)
+            self.ew.log("ERROR", log_message)
             return None
 
     # Method to update checkpoint file
@@ -81,7 +75,8 @@ class Checkpointer:
             os.remove(self.checkpoint_file_name)
             os.rename(tmp_file, self.checkpoint_file_name)
         except Exception, e:
-            logging.error("Zenoss Events: Failed to update checkpoint file: %s" % e)
+            log_message = "Zenoss Events: Failed to update checkpoint file: %s" % e
+            self.ew.log("ERROR", log_message)
 
     # Method to clean checkpoint file
     def clean(self, events_dict, checkpoint_delete_threshold, now_epoch, zenoss_tz):
@@ -94,6 +89,7 @@ class Checkpointer:
                 if epoch_delta >= int(checkpoint_delete_threshold):
                     del events_dict[k]
 
+# Inherit Script class from splunklib
 class ZenossModInput(Script):
 
     # Write JSON event to stdout and Flush
@@ -155,8 +151,9 @@ class ZenossModInput(Script):
                 continue
 
             # Event is unchanged - log info
-            logging.info("Zenoss Events: EventID %s present and unchanged since lastTime %s -- skipping" % (evid,
-                                                                                                            last_time))
+            log_message = "Zenoss Events: EventID %s present and unchanged since \
+lastTime %s -- skipping" % (evid, last_time)
+            ew.log("INFO", log_message)
 
     # Calculate epoch time delta
     # params:
@@ -172,7 +169,10 @@ class ZenossModInput(Script):
         epoch_delta = round(float(now_epoch - tstamp_epoch)/time_units,2)
         return(epoch_delta)
 
-
+    # Override get_scheme method
+    # Define Scheme
+    # params:
+    #  none
     def get_scheme(self):
         scheme = Scheme("Zenoss Events")
         scheme.description = "Modular input to pull events from Zenoss API"
@@ -259,7 +259,7 @@ class ZenossModInput(Script):
        
         return scheme 
 
-
+    # Override validate_input method
     # Validate form input
     # params: None
     def validate_input(self, validation_definition):
@@ -311,7 +311,9 @@ interface address are correct" % zenoss_server)
         if validation_failed:
             sys.exit(2)
 
-
+    # Override stream_events method
+    # 
+    # Johnny Walker neat, do it... do it!
     def stream_events(self, inputs, ew):
         instance = inputs.inputs.keys().pop()
         config = inputs.inputs[instance]
@@ -349,8 +351,7 @@ interface address are correct" % zenoss_server)
             
 
         # Load checkpoint file
-        #chk = Checkpointer(str(inputs.metadata.get("checkpoint_dir")), str(config["name"]))
-        chk = Checkpointer(str(inputs.metadata.get("checkpoint_dir")), str(input_name))
+        chk = Checkpointer(str(inputs.metadata.get("checkpoint_dir")), str(input_name), ew)
         events_dict = chk.load
 
         if not events_dict:
@@ -370,9 +371,8 @@ interface address are correct" % zenoss_server)
                 gzip.open(chk.checkpoint_file_name, 'wb').close()
                 chk.update(events_dict)
             except Exception, e:
-                logging.error("Zenoss Events: Failed to create checkpoint file %s - Error: %s" % (chk.checkpoint_file_name,
-                                                                                                  e))
-
+                log_message = "Zenoss Events: Failed to create checkpoint file %s - Error: %s" % (chk.checkpoint_file_name, e)
+                ew.log("ERROR", log_message)
         try:
             device = config.get("device")
         except Exception:
@@ -380,8 +380,7 @@ interface address are correct" % zenoss_server)
 
         while True:
             # Load checkpoint file
-            chk = Checkpointer(str(inputs.metadata.get("checkpoint_dir")), str(input_name))
-            #chk = Checkpointer(str(config["checkpoint_dir"]), str(config["name"]))
+            chk = Checkpointer(str(inputs.metadata.get("checkpoint_dir")), str(input_name), ew)
             events_dict = chk.load
             run_from = events_dict.get("run_from")
 
@@ -397,9 +396,10 @@ interface address are correct" % zenoss_server)
             try:
                 z = ZenossAPI(zenoss_server, username, password)
             except Exception, e:
-                logging.error("Zenoss Events: Failed to connect to server %s as user %s - Error: %s" % (zenoss_server,
+                log_message = "Zenoss Events: Failed to connect to server %s as user %s - Error: %s" % (zenoss_server,
                                                                                                         username,
-                                                                                                        e))
+                                                                                                        e)
+                ew.log("ERROR", log_message)
                 sys.exit(1)
 
             # Get Events
@@ -423,7 +423,8 @@ interface address are correct" % zenoss_server)
                 # last read exceeds archive threshold 
                 if archive_delta >= archive_threshold or \
                    not last_archive_read:
-                    logging.error("Zenoss Events: Processing Archived Events\n" % params)
+                    log_message = "Zenoss Events: Processing Archived Events\n" % params
+                    ew.log("ERROR", log_message)
                     archive_events = z.get_events(device, start=start, archive=True, last_time=run_from)
                     self.process_events(archive_events, events_dict, ew, params)
                     events_dict['last_archive_read'] = cur_time
