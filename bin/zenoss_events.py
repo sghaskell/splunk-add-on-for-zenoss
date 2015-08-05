@@ -35,88 +35,6 @@ CHECKPOINT_CLEAN_FREQUENCY = 1
 DAY = 86400
 HOUR = 60
 
-# Write JSON event to stdout and Flush
-# Params:
-#  e - event
-def write_event(e, ew):
-    #sys.stdout.write("%s\n" % json.dumps(e))
-    #sys.stdout.flush()
-    event = Event(data = json.dumps(e))
-    ew.write_event(event)
-
-# Process Zenoss events
-# params:
-#  events - Events returned from Zenoss JSON API
-#  events_dict - checkpoint file containing processed events
-#  params - additional parameters for indexing closed & cleared events
-def process_events(events, events_dict, ew, params=None):
-    for e in events['events']:
-        evid = str(e['evid'])
-        last_time = str(e['lastTime'])
-        first_time = str(e['firstTime'])
-        state_change = str(e['stateChange'])
-        event_state = str(e['eventState'])
-        event_count = int(e['count'])
-
-        # Event hasn't been seen; add to checkpoint and index
-        if evid not in events_dict:
-            # Event not seen yet
-            write_event(e, ew)
-            events_dict[evid] = dict(last_time=last_time, event_state=event_state, event_count=event_count)
-            continue 
-
-        # Get last timestamp and state from checkpoint
-        last_event_ts = events_dict[evid]['last_time']
-        last_event_state = events_dict[evid]['event_state']
-        try:
-            last_event_count = events_dict[evid]['event_count']
-        except Exception:
-            last_event_count = event_count
-
-        # index if count is greater than last count
-        if 'index_repeats' in params \
-           and event_count > last_event_count:
-            write_event(e, ew)
-            events_dict[evid] = dict(last_time=last_time, event_state=event_state, event_count=event_count)
-            continue
-
-        if (last_time == first_time or last_time == state_change) and \
-           last_time != last_event_ts:
-            write_event(e, ew)
-            events_dict[evid] = dict(last_time=last_time, event_state=event_state, event_count=event_count)
-            continue
-
-        # Check for cleared, closed or re-opened events
-        if params and \
-           event_state != last_event_state:
-            write_event(e, ew)
-            events_dict[evid] = dict(last_time=last_time, event_state=event_state, event_count=event_count)
-            continue
-
-        # Event is unchanged - log info
-        logging.info("Zenoss Events: EventID %s present and unchanged since lastTime %s -- skipping" % (evid,
-                                                                                                        last_time))
-
-# Calculate epoch time delta
-# params:
-#  tstamp - timestamp
-#  format - strptime format of timestamp
-#  now_epoch - local epoch
-#  zenoss_tz - pytz timezone of Zenoss server
-#  time_units - divisor (minutes, seconds, hours) for float
-def calc_epoch_delta(tstamp, format, now_epoch, zenoss_tz, time_units):
-    tstamp_dt = datetime.strptime(tstamp, format)
-    tstamp_local = zenoss_tz.localize(tstamp_dt)
-    tstamp_epoch = calendar.timegm(tstamp_local.utctimetuple())
-    epoch_delta = round(float(now_epoch - tstamp_epoch)/time_units,2)
-    return(epoch_delta)
-
-
-# Print error message to Splunk
-# params:
-#  s - error string
-def print_validation_error(s):
-    print "<error><message>%s</message></error>" % xml.sax.saxutils.escape(s)
 
 # Checkpoint file class
 class Checkpointer:
@@ -172,11 +90,88 @@ class Checkpointer:
         for k in keys:
             if 'last_time' in events_dict[k]:
                 last_time = events_dict[k]['last_time']
-                epoch_delta = calc_epoch_delta(last_time, ts_format, now_epoch, zenoss_tz, DAY)
+                epoch_delta = self.calc_epoch_delta(last_time, ts_format, now_epoch, zenoss_tz, DAY)
                 if epoch_delta >= int(checkpoint_delete_threshold):
                     del events_dict[k]
 
 class ZenossModInput(Script):
+
+    # Write JSON event to stdout and Flush
+    # Params:
+    #  e - event
+    def write_event(self, e, ew):
+        #sys.stdout.write("%s\n" % json.dumps(e))
+        #sys.stdout.flush()
+        event = Event(data = json.dumps(e))
+        ew.write_event(event)
+
+    # Process Zenoss events
+    # params:
+    #  events - Events returned from Zenoss JSON API
+    #  events_dict - checkpoint file containing processed events
+    #  params - additional parameters for indexing closed & cleared events
+    def process_events(self, events, events_dict, ew, params=None):
+        for e in events['events']:
+            evid = str(e['evid'])
+            last_time = str(e['lastTime'])
+            first_time = str(e['firstTime'])
+            state_change = str(e['stateChange'])
+            event_state = str(e['eventState'])
+            event_count = int(e['count'])
+
+            # Event hasn't been seen; add to checkpoint and index
+            if evid not in events_dict:
+                # Event not seen yet
+                self.write_event(e, ew)
+                events_dict[evid] = dict(last_time=last_time, event_state=event_state, event_count=event_count)
+                continue 
+
+            # Get last timestamp and state from checkpoint
+            last_event_ts = events_dict[evid]['last_time']
+            last_event_state = events_dict[evid]['event_state']
+            try:
+                last_event_count = events_dict[evid]['event_count']
+            except Exception:
+                last_event_count = event_count
+
+            # index if count is greater than last count
+            if 'index_repeats' in params \
+               and event_count > last_event_count:
+                self.write_event(e, ew)
+                events_dict[evid] = dict(last_time=last_time, event_state=event_state, event_count=event_count)
+                continue
+
+            if (last_time == first_time or last_time == state_change) and \
+               last_time != last_event_ts:
+                self.write_event(e, ew)
+                events_dict[evid] = dict(last_time=last_time, event_state=event_state, event_count=event_count)
+                continue
+
+            # Check for cleared, closed or re-opened events
+            if params and \
+               event_state != last_event_state:
+                self.write_event(e, ew)
+                events_dict[evid] = dict(last_time=last_time, event_state=event_state, event_count=event_count)
+                continue
+
+            # Event is unchanged - log info
+            logging.info("Zenoss Events: EventID %s present and unchanged since lastTime %s -- skipping" % (evid,
+                                                                                                            last_time))
+
+    # Calculate epoch time delta
+    # params:
+    #  tstamp - timestamp
+    #  format - strptime format of timestamp
+    #  now_epoch - local epoch
+    #  zenoss_tz - pytz timezone of Zenoss server
+    #  time_units - divisor (minutes, seconds, hours) for float
+    def calc_epoch_delta(self, tstamp, format, now_epoch, zenoss_tz, time_units):
+        tstamp_dt = datetime.strptime(tstamp, format)
+        tstamp_local = zenoss_tz.localize(tstamp_dt)
+        tstamp_epoch = calendar.timegm(tstamp_local.utctimetuple())
+        epoch_delta = round(float(now_epoch - tstamp_epoch)/time_units,2)
+        return(epoch_delta)
+
 
     def get_scheme(self):
         scheme = Scheme("Zenoss Events")
@@ -267,9 +262,7 @@ class ZenossModInput(Script):
 
     # Validate form input
     # params: None
-    #def do_validate():
     def validate_input(self, validation_definition):
-        #try:
         username = validation_definition.parameters["username"]
         password = validation_definition.parameters["password"]
         zenoss_server = validation_definition.parameters["zenoss_server"]
@@ -300,6 +293,7 @@ example: 2015-03-16T00:00:00')
 
                 validation_failed = True
 
+        # Validate timezone exists in pytz database
         if tz is not None and tz not in pytz.all_timezones:
             raise ValueError("Invalid timezone - See http://en.wikipedia.org/wiki/List_of_tz_database_time_zones \
 for reference")
@@ -310,18 +304,12 @@ for reference")
             z = ZenossAPI(zenoss_server, username, password)
             events = z.get_events(None, start=0, limit=1)
         except ValueError, e:
-            failure_string = "Failed to connect to %s and query for an event - Check username, password and web \
-interface address are correct" % zenoss_server
-            print_validation_error(failure_string)
+            raise ValueError("Failed to connect to %s and query for an event - Verify username, password and web \
+interface address are correct" % zenoss_server)
             validation_failed = True
 
         if validation_failed:
             sys.exit(2)
-
-        #except RuntimeError,e:
-        #    logging.error("Looks like an error: %s" % str(e))
-        #    sys.exit(1)
-
 
 
     def stream_events(self, inputs, ew):
@@ -416,7 +404,7 @@ interface address are correct" % zenoss_server
 
             # Get Events
             events = z.get_events(device, start=start, last_time=run_from, closed=index_closed, cleared=index_cleared, suppressed=index_suppressed)
-            process_events(events, events_dict, ew, params)
+            self.process_events(events, events_dict, ew, params)
 
             # Update last run timestamp
             events_dict['last_run'] = cur_time
@@ -426,7 +414,7 @@ interface address are correct" % zenoss_server
                 # Get last archive read, convert and create epoch timestamp
                 try:
                     last_archive_read = events_dict['last_archive_read']
-                    archive_delta = calc_epoch_delta(last_archive_read, DATE_FORMAT, now_epoch, zenoss_tz, HOUR)
+                    archive_delta = self.calc_epoch_delta(last_archive_read, DATE_FORMAT, now_epoch, zenoss_tz, HOUR)
                 except Exception:
                     last_archive_read = None
                     archive_delta = 0
@@ -437,7 +425,7 @@ interface address are correct" % zenoss_server
                    not last_archive_read:
                     logging.error("Zenoss Events: Processing Archived Events\n" % params)
                     archive_events = z.get_events(device, start=start, archive=True, last_time=run_from)
-                    process_events(archive_events, events_dict, ew, params)
+                    self.process_events(archive_events, events_dict, ew, params)
                     events_dict['last_archive_read'] = cur_time
 
             # Clean checkpoint file
@@ -448,7 +436,7 @@ interface address are correct" % zenoss_server
 
             # Check to see if we need to clean the checkpoint file based on the 
             # checkpoint delta threshold
-            last_cleaned_delta = calc_epoch_delta(last_cleaned, DATE_FORMAT, now_epoch, zenoss_tz, DAY)
+            last_cleaned_delta = self.calc_epoch_delta(last_cleaned, DATE_FORMAT, now_epoch, zenoss_tz, DAY)
 
             # Clean checkpoint file of old archive records
             if last_cleaned_delta >= CHECKPOINT_CLEAN_FREQUENCY:
