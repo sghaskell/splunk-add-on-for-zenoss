@@ -281,7 +281,7 @@ lastTime %s -- skipping" % (evid, last_time)
             validation_failed = True
 
         if not interval is None and int(interval) < 1:
-            raise ValueError("Interval value must be a positive integer")
+            raise ValueError("Interval value must be a non-zero positive integer")
             validation_failed = True
 
         if start_date is not None:
@@ -309,7 +309,7 @@ interface address are correct" % zenoss_server)
             validation_failed = True
 
         if validation_failed:
-            sys.exit(2)
+            sys.exit(1)
 
     # Override stream_events method
     # 
