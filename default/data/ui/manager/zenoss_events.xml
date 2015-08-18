@@ -1,5 +1,5 @@
 <endpoint name="data/inputs/zenoss_events">
-  <header>REST</header>
+  <header>Zenoss Events</header>
   <breadcrumb>
     <parent hidecurrent="False">datainputstats</parent>
     <name>Zenoss Events</name>
