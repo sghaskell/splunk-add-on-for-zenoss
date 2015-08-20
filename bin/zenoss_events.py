@@ -276,7 +276,7 @@ lastTime %s -- skipping" % (evid, last_time)
         if not zenoss_server:
             raise ValueError("Please specify Zenoss web interface")
 
-        if not interval is None and int(interval) < 1:
+        if int(interval) < 1:
             raise ValueError("Interval value must be a non-zero positive integer")
 
         if start_date is not None:
