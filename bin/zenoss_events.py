@@ -270,19 +270,14 @@ lastTime %s -- skipping" % (evid, last_time)
         start_date = validation_definition.parameters["start_date"]
         tz = validation_definition.parameters["tzone"]
 
-        validation_failed = False
-
         if not username:
             raise ValueError("Please specify valid username")
-            validation_failed = True
 
         if not zenoss_server:
             raise ValueError("Please specify Zenoss web interface")
-            validation_failed = True
 
         if not interval is None and int(interval) < 1:
             raise ValueError("Interval value must be a non-zero positive integer")
-            validation_failed = True
 
         if start_date is not None:
             p = re.compile("\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}")
@@ -291,25 +286,18 @@ lastTime %s -- skipping" % (evid, last_time)
                 raise ValueError('Date does not match the correct format: %Y-%m-%dT%H:%M:%S; \
 example: 2015-03-16T00:00:00')
 
-                validation_failed = True
-
         # Validate timezone exists in pytz database
         if tz is not None and tz not in pytz.all_timezones:
             raise ValueError("Invalid timezone - See http://en.wikipedia.org/wiki/List_of_tz_database_time_zones \
 for reference")
-            validation_failed = True
 
         # Connect to Zenoss server and get an event to validate connection parameters are correct
         try:
             z = ZenossAPI(zenoss_server, username, password)
             events = z.get_events(None, start=0, limit=1)
-        except ValueError, e:
+        except:
             raise ValueError("Failed to connect to %s and query for an event - Verify username, password and web \
 interface address are correct" % zenoss_server)
-            validation_failed = True
-
-        if validation_failed:
-            sys.exit(1)
 
     # Override stream_events method
     # 
