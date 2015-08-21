@@ -270,12 +270,6 @@ lastTime %s -- skipping" % (evid, last_time)
         start_date = validation_definition.parameters["start_date"]
         tz = validation_definition.parameters["tzone"]
 
-        if not username:
-            raise ValueError("Please specify valid username")
-
-        if not zenoss_server:
-            raise ValueError("Please specify Zenoss web interface")
-
         if int(interval) < 1:
             raise ValueError("Interval value must be a non-zero positive integer")
 
