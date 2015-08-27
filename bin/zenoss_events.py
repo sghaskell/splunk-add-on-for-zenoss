@@ -21,6 +21,9 @@ DATE_FORMAT = "%Y-%m-%dT%H:%M:%S"
 # Clean checkpoint file once per day
 CHECKPOINT_CLEAN_FREQUENCY = 1
 
+# Number of events to process - Max 1000
+LIMIT = 1000
+
 # Time definitions
 DAY = 86400
 HOUR = 60
@@ -91,6 +94,62 @@ class Checkpointer:
 
 # Inherit Script class from splunklib
 class ZenossModInput(Script):
+
+    # Get events from JSON api and process
+    # Zenoss JSON API only sends 1000 events no matter how
+    # high the limit is set. We have to page through results
+    # 1000 events at a time and process them.
+    # Params:
+    #  z - ZenossAPI object
+    #  events_dict - checkpoint file containing processed events
+    #  ew - event writer object
+    #  params - additional parameters for indexing closed & cleared events
+    #  device - device to filter on
+    #  start - record to start collecting from
+    #  run_from - date to filter events on
+    #  index_closed (boolean) - index closed events
+    #  index_cleared (boolean) - index cleared events
+    #  index_suppressed (boolean) - index suppressed events
+    #  archive (boolean)- get archive history
+    def get_and_process_events(self,
+                           z,
+                           events_dict,
+                           ew,
+                           params,
+                           device,
+                           start,
+                           run_from,
+                           index_closed,
+                           index_cleared,
+                           index_suppressed,
+                           archive=False):
+        if(archive):
+            events = z.get_events(device,
+                                  start=start,
+                                  archive=archive,
+                                  last_time=run_from)
+        else:
+            events = z.get_events(device,
+                                  start=start,
+                                  last_time=run_from,
+                                  closed=index_closed,
+                                  cleared=index_cleared,
+                                  suppressed=index_suppressed)
+        if(events['events']):
+            start += LIMIT
+            self.process_events(events, events_dict, ew, params)
+            self.get_and_process_events(z,
+                                        events_dict,
+                                        ew,
+                                        params,
+                                        device,
+                                        start,
+                                        run_from,
+                                        index_closed,
+                                        index_cleared,
+                                        index_suppressed,
+                                        archive)
+        return
 
     # Write JSON event to stdout and Flush
     # Params:
@@ -385,8 +444,16 @@ interface address are correct" % zenoss_server)
                 sys.exit(1)
 
             # Get Events
-            events = z.get_events(device, start=start, last_time=run_from, closed=index_closed, cleared=index_cleared, suppressed=index_suppressed)
-            self.process_events(events, events_dict, ew, params)
+            self.get_and_process_events(z,
+                                        events_dict,
+                                        ew,
+                                        params,
+                                        device,
+                                        start,
+                                        run_from,
+                                        index_closed,
+                                        index_cleared,
+                                        index_suppressed)
 
             # Update last run timestamp
             events_dict['last_run'] = cur_time
@@ -406,9 +473,18 @@ interface address are correct" % zenoss_server)
                 if archive_delta >= archive_threshold or \
                    not last_archive_read:
                     log_message = "Zenoss Events: Processing Archived Events\n" % params
-                    ew.log("ERROR", log_message)
-                    archive_events = z.get_events(device, start=start, archive=True, last_time=run_from)
-                    self.process_events(archive_events, events_dict, ew, params)
+                    ew.log("INFO", log_message)
+                    self.get_and_process_events(z,
+                                        events_dict,
+                                        ew,
+                                        params,
+                                        device,
+                                        start,
+                                        run_from,
+                                        index_closed,
+                                        index_cleared,
+                                        index_suppressed,
+                                        archive=True)
                     events_dict['last_archive_read'] = cur_time
 
             # Clean checkpoint file
