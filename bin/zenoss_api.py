@@ -88,7 +88,7 @@ class ZenossAPI():
                    closed=None,
                    cleared=None,
                    suppressed=None,
-                   limit=1000000000):
+                   limit=1000):
         data = dict(start=start, limit=limit, dir='DESC', sort='severity', archive=archive)
         if(archive):
             data['params'] = dict(severity=[5,4,3,2,0], eventState=[0,1,2,3,4,6])
