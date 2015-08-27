@@ -185,7 +185,7 @@
               <key name="exampleText">How often to run the script (in seconds). Defaults to 60 seconds.</key>
               <key name="processValueList">_('60') if (value==None or value=='') else value</key> 
               <key name="submitValueAdd">value if ( value!=None and value!='' ) else _('60')</key>
-              <key name="submitValueEdit">value if ( value!=None and value!='' ) else _(60')</key>
+              <key name="submitValueEdit">value if ( value!=None and value!='' ) else _('60')</key>
             </element>
             <element name="hostFields" type="fieldset">
               <key name="legend">Host</key>
