@@ -10,7 +10,7 @@ ZENOSS_SERVER_CONFIG = "local/zenoss_servers.conf"
 HASH_CHK_FILE = ".server_config_hash"
 
 class ZenossServerConfig:
-    def __init__(self, stanza):
+    def __init__(self, stanza, force=False):
         self.splunk_home = os.environ['SPLUNK_HOME']
         self._hash_chk_file = "%s/%s/%s" % (self.splunk_home, BIN_DIR, HASH_CHK_FILE)
         self.config_path = "%s/%s/%s" % (self.splunk_home, APPS_DIR, ZENOSS_SERVER_CONFIG)
@@ -19,6 +19,9 @@ class ZenossServerConfig:
         self.password = None
         self.web_address = None
         self.config = self._read_config()
+
+        if force:
+            return
 
         if self._check_hash(self.stanza):
             self.password = base64.b64decode(self.password)
@@ -82,8 +85,11 @@ class ZenossServerConfig:
 
         return config
 
-    def _hash_password(self):
-        pw_hash = base64.b64encode(self.password)
+    def _hash_password(self, password=None):
+        if(password):
+            pw_hash = base64.b64encode(password)
+        else:
+            pw_hash = base64.b64encode(self.password)
         try:
             f = open(self.config_path, 'w+')
         except Exception, e:
