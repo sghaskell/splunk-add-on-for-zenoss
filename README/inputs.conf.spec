@@ -4,6 +4,8 @@
 username = <value>
 password = <value>
 zenoss_server = <value>
+no_ssl_cert_check = <value>
+cafile = <value>
 device = <value>
 start_date = <value>
 index_closed = <value>

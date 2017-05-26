@@ -46,7 +46,7 @@ def main():
     config = ZenossServerConfig(flags.stanza)
     
     try:
-        z = ZenossAPI(config.web_address, config.username, config.password)
+        z = ZenossAPI(config.web_address, config.username, config.password, int(config.no_ssl_cert_check), config.cafile)
     except Exception, e:
         logging.error("Zenoss Create Event: Failed to connect to zenoss server - %s" % e)
 

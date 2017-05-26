@@ -45,7 +45,13 @@ Index - specify zenoss index
 [<font color="red">zenoss</font>]
 username = admin
 password = mysecurepassword 
+# Compatible with zenoss5 - https://zenoss5.mydomain.com
 web_address = http://zenoss:8080
+# 0 == check certificate, 1 == do not check certificate
+no_ssl_cert_check = 0
+# Optional - path to CA file in PEM format for certificates signed by untrusted root CA
+# Do not comment out if you don't use this setting
+cafile = 
         </pre>
         
         <p>The password will get hashed the first time an alert is triggered.</p>

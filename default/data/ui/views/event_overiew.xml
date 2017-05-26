@@ -8,13 +8,23 @@
         <latest>now</latest>
       </default>
     </input>
+    <input type="dropdown" token="index" searchWhenChanged="true">
+      <label>Index</label>
+      <fieldForLabel>title</fieldForLabel>
+      <fieldForValue>title</fieldForValue>
+      <search>
+        <query>| rest /services/data/indexes count=0 | fields title</query>
+        <earliest>0</earliest>
+        <latest></latest>
+      </search>
+    </input>
   </fieldset>
   <row>
     <panel>
       <title>Events By Severity</title>
       <chart>
         <search>
-          <query>index=zenoss | timechart usenull=f count by vendor_severity</query>
+          <query>index=$index$ | timechart usenull=f count by vendor_severity</query>
           <earliest>$field1.earliest$</earliest>
           <latest>$field1.latest$</latest>
         </search>
@@ -47,17 +57,17 @@
       <table>
         <title>Events By Component</title>
         <search>
-          <query>index=zenoss sourcetype=zenoss-events | chart sparkline count by component.text | rename component.text as component | rename sparkline as trend | sort - count</query>
+          <query>index=$index$ sourcetype=zenoss-events | chart sparkline count by component.text | rename component.text as component | rename sparkline as trend | sort - count</query>
           <earliest>$field1.earliest$</earliest>
           <latest>$field1.latest$</latest>
         </search>
-        <option name="wrap">true</option>
-        <option name="rowNumbers">true</option>
+        <!-- Set sparkline options here; make sure that field matches field name of the search results -->
+        <option name="count">10</option>
         <option name="dataOverlayMode">none</option>
         <option name="drilldown">cell</option>
-        <option name="count">10</option>
-        <!-- Set sparkline options here; make sure that field matches field name of the search results -->
-        <format type="sparkline" field="trend">
+        <option name="rowNumbers">true</option>
+        <option name="wrap">true</option>
+        <format field="trend" type="sparkline">
           <option name="lineColor">#5379af</option>
           <option name="fillColor">#CCDDFF</option>
           <option name="lineWidth">1</option>
@@ -70,17 +80,17 @@
       <table>
         <title>Events By State</title>
         <search>
-          <query>index=zenoss sourcetype=zenoss-events | chart sparkline count by eventState | rename eventState as "Event State" | rename sparkline as trend | sort - count</query>
+          <query>index=$index$ sourcetype=zenoss-events | chart sparkline count by eventState | rename eventState as "Event State" | rename sparkline as trend | sort - count</query>
           <earliest>$field1.earliest$</earliest>
           <latest>$field1.latest$</latest>
         </search>
-        <option name="wrap">true</option>
-        <option name="rowNumbers">true</option>
+        <!-- Set sparkline options here; make sure that field matches field name of the search results -->
+        <option name="count">10</option>
         <option name="dataOverlayMode">none</option>
         <option name="drilldown">cell</option>
-        <option name="count">10</option>
-        <!-- Set sparkline options here; make sure that field matches field name of the search results -->
-        <format type="sparkline" field="trend">
+        <option name="rowNumbers">true</option>
+        <option name="wrap">true</option>
+        <format field="trend" type="sparkline">
           <option name="lineColor">#5379af</option>
           <option name="fillColor">#CCDDFF</option>
           <option name="lineWidth">1</option>

@@ -18,6 +18,8 @@ class ZenossServerConfig:
         self.username = None
         self.password = None
         self.web_address = None
+        self.no_ssl_cert_check = False
+        self.cafile = None
         self.config = self._read_config()
 
         if force:
@@ -79,6 +81,8 @@ class ZenossServerConfig:
             self.username = c.add_option('username', keys = self.stanza).get()
             self.password = c.add_option('password', keys = self.stanza).get()
             self.web_address = c.add_option('web_address', keys = self.stanza).get()
+            self.no_ssl_cert_check = c.add_option('no_ssl_cert_check', keys = self.stanza).get()
+            self.cafile = c.add_option('cafile', keys = self.stanza).get()
         except Exception, e:
             sys.stderr.write("Faled to parse config - %s\n" % e)
             sys.exit(1)

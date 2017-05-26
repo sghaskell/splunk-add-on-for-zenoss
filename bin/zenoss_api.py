@@ -10,7 +10,8 @@
 import json
 import urllib
 import urllib2
-
+import ssl
+import re
 
 ROUTERS = { 'MessagingRouter': 'messaging',
         'EventsRouter': 'evconsole',
@@ -25,17 +26,29 @@ ROUTERS = { 'MessagingRouter': 'messaging',
         'ZenPackRouter': 'zenpack' }
 
 class ZenossAPI():
-    def __init__(self, server, username, password, debug=False):
+    def __init__(self, server, username, password, no_ssl_cert_check=False, cafile=None, debug=False):
         self.ZENOSS_INSTANCE = server
         self.ZENOSS_USERNAME = username
         self.ZENOSS_PASSWORD = password
+        self.isSslConnection = re.match(r'https',self.ZENOSS_INSTANCE)
 
+        # Added to support SSL connections for Zenoss 5.x
+        if(self.isSslConnection):
+            self.ctx = ssl.create_default_context(cafile=cafile)
+            if no_ssl_cert_check:
+                self.ctx.check_hostname = False
+                self.ctx.verify_mode = ssl.CERT_NONE
+            self.ssl_handler = urllib2.HTTPSHandler(context=self.ctx)
+            self.urlOpener = urllib2.build_opener(self.ssl_handler, urllib2.HTTPCookieProcessor())
+        else:
+            self.urlOpener = urllib2.build_opener(urllib2.HTTPCookieProcessor())
+
+        
         """
         Initialize the API connection, log in, and store authentication cookie
         """
         # Use the HTTPCookieProcessor as urllib2 does not save cookies by default
-        self.urlOpener = urllib2.build_opener(urllib2.HTTPCookieProcessor())
-        if debug: self.urlOpener.add_handler(urllib2.HTTPHandler(debuglevel=1))
+        #if debug: self.urlOpener.add_handler(urllib2.HTTPHandler(debuglevel=1))
         self.reqCount = 1
 
         # Contruct POST params and submit login.
