@@ -17,6 +17,8 @@ Username: zenoss username
 password: zenoss password
 Zenoss Web Interface: Web interface to Zenoss server; e.g. http://zenoss-server:8080
 Device Name (Optional): Filter to only pull from a specific device. Defaults to all devices
+Disable SSL Certificate Verification: Check to disable SSL verification. **WARNING** This is a potentially dangerous option.
+CA File: (Optional): Specify certificate authority file in PEM format for certificates signed by untrusted root authority
 Timezone (Optional): Timezone of Zenoss server - see http://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 Archive Threshold - Zenoss 'Event Archive Threshold (minutes)' setting. Interval to read archive table. Leave blank for Zenoss default of 4320.
 Event Checkpoint Removal - Zenoss 'Delete Archived Events Older Than (days)' setting. Used to keep checkpoint file clean. Leave blank for Zenoss default of 90.
