@@ -82,7 +82,7 @@ function ($,
         var html = "";
         var tdHtml = "";
         var contextMenu = '<ul id="example1-context-menu" class="dropdown-menu"><li data-item="update"><a>Update</a></li><li data-item="delete"><a>Delete</a></li></ul>';
-        var header = '<table id="rest-password-table" class="table dashboard-element table-hover">' + '<thead><tr><th style><div class="th-inner ">Username</div><div class="fht-cell"></div></th>' + '<th style><div class="th-inner ">Password</div><div class="fht-cell"></div></th>' + '<th style><div class="th-inner ">Realm</div><div class="fht-cell"></div></th>' + '<th style><div class="th-inner ">App</div><div class="fht-cell"></div></th>' + '<th style><div class="th-inner ">Clear Password</div><div class="fht-cell"></div></th></tr></thead><tbody>';
+        var header = '<table id="rest-password-table" class="table table-striped dashboard-element table-hover">' + '<thead class="thead-default"><tr><th style><div class="th-inner "><h3>Username</h3></div><div class="fht-cell"></div></th>' + '<th style><div class="th-inner "><h3>Password</h3></div><div class="fht-cell"></div></th>' + '<th style><div class="th-inner "><h3><h3>Realm</h3></div><div class="fht-cell"></div></th>' + '<th style><div class="th-inner "><h3>App</h3></div><div class="fht-cell"></div></th>' + '<th style><div class="th-inner "><h3>Clear Password</h3></div><div class="fht-cell"></div></th></tr></thead><tbody>';
         html += header;
         _.each(data, function(row, i) {
             console.log(row);
@@ -110,7 +110,7 @@ function ($,
     }
 
     function renderCreateUserForm() {
-        var html = '<h1>Create User</h1><br><form id="createCredential"> <div class="form-group"><label for="username">Username</label> <input type="username" class="form-control" id="createUsername" placeholder="Enter username"></div><p></p><div class="form-group"> <label for="password">Password</label> <input type="password" class="form-control" id="createPassword" placeholder="Password"></div><label for="confirmPassword">Confirm Password</label> <input type="password" class="form-control" id="createConfirmPassword" placeholder="Confirm Password"> </div> <div class="form-group"> <label for="realm">Realm</label> <input type="realm" class="form-control" id="createRealm" placeholder="Realm"><br></br></div> <button type="submit" class="btn btn-primary">Create</button> </form>'
+        var html = '<h1>Create User</h1><p>Right click on row to update or delete credentials.</p><form id="createCredential"> <div class="form-group"><label for="username">Username</label> <input type="username" class="form-control" id="createUsername" placeholder="Enter username"></div><p></p><div class="form-group"> <label for="password">Password</label> <input type="password" class="form-control" id="createPassword" placeholder="Password"></div><label for="confirmPassword">Confirm Password</label> <input type="password" class="form-control" id="createConfirmPassword" placeholder="Confirm Password"> </div> <div class="form-group"> <label for="realm">Realm</label> <input type="realm" class="form-control" id="createRealm" placeholder="Realm"><br></br></div> <button type="submit" class="btn btn-primary">Create</button> </form>'
         $('#create-user').append(html);
 
         $( "#createCredential" ).submit(function( event ) {
