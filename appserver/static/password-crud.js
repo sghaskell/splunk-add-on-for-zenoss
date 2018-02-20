@@ -56,10 +56,10 @@ function ($,
         });
     }
 
-    function updateCredential(row, tableDiv) {
+    function deleteCredential(row, tableDiv) {
         var username=Splunk.util.getConfigValue("USERNAME");      
         var url = "/en-US/splunkd/__raw/servicesNS/" + username + "/" + row[3] + "/storage/passwords/" + row[2] + ":" + row[0] +":";
-        var updateUser= confirm("You're about to the password for user " + row[0] + ":" + row[2] + " - Press ok to continue");
+        var deleteUser= confirm("You're about to the password for user " + row[0] + ":" + row[2] + " - Press ok to continue");
 
         if(deleteUser) { 
             $.ajax({
@@ -70,7 +70,7 @@ function ($,
                     location.reload(); 
                 },
                 error: function() {
-                    alert("Failed to add user " + row[0] + ". See console for details");
+                    alert("Failed to delete user " + row[0] + ". See console for details");
                 }
             });
         }
