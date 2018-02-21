@@ -20,6 +20,9 @@ function ($,
 
     /* Run Search */
     function runSearch() {
+        var contextMenuDiv = '#context-menu';
+        var passwordTableDiv = '#password-table';
+
         var search1 = new SearchManager({
                 "id": "search1",
                 "cancelOnUnload": true,
@@ -50,8 +53,8 @@ function ($,
 
             if(properties.content.resultCount == 0) {
                 console.log("No Results");
-                Messages.render("no-results", $(passwordTableDiv));
-                return;
+                var noData = null;
+                createTable(passwordTableDiv, contextMenuDiv, noData);
             }
         });
 
@@ -98,7 +101,8 @@ function ($,
     }
 
     function createTable(tableDiv, contextMenuDiv, data) {
-        var html = '<p><button id="main-create" class="btn btn-primary">Create</button></p>';
+        var html = '<p> Click <b>Create</b> to add a user or right click on a row to create, update or delete.</p> \
+                    <p><button id="main-create" class="btn btn-primary">Create</button></p>';
         var tdHtml = "";
         var contextMenu = '<ul id="example1-context-menu" class="dropdown-menu"> \
                              <li data-item="create"><a>Create</a></li> \
@@ -146,7 +150,7 @@ function ($,
         });
     }
 
-    function renderModal(id, title, body, buttonText, callback, callbackArgs=null) {
+    function renderModal(id, title, body, buttonText, callback=null, callbackArgs=null) {
         var myModal = new Modal(id, {
                  title: title,
                  destroyOnHide: true,
@@ -161,9 +165,9 @@ function ($,
             return true;
         }
 
-        $(myModal.$el).on("hide", function(){
+        // $(myModal.$el).on("hide", function(){
             // Not taking any action on hide, but you can if you want to!
-        })
+        // })
  
         myModal.body.append($(body));
  
@@ -218,7 +222,7 @@ function ($,
                         console.log(e);
                         renderModal("user-add-fail",
                                     "Failed User Creation",
-                                    "<p>Failed to create user " + username + ":" + realm + "</p>",
+                                    "<p>Failed to create user " + username + ":" + realm + "</p><br><p>" + e.responseText + "</p>",
                                     "Close",
                                     function() {return});
                     }
@@ -287,7 +291,7 @@ function ($,
                     success: function() {
                         renderModal("password-updated",
                                     "Password Updated",
-                                    "<p>Password successfully updated for user" + username + ":" + app + "</p>",
+                                    "<p>Password successfully updated for user " + username + ":" + app + "</p>",
                                     "Close",
                                     refreshWindow);
                     },
@@ -333,8 +337,6 @@ function ($,
         
     }
 
-    var contextMenuDiv = '#context-menu';
-    var passwordTableDiv = '#password-table';
     
     runSearch();
 
