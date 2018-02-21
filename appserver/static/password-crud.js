@@ -98,11 +98,10 @@ function ($,
     }
 
     function createTable(tableDiv, contextMenuDiv, data) {
-        console.log("in Scott's new module");
-        console.log(data);
-        var html = "";
+        var html = '<p><button id="main-create" class="btn btn-primary">Create</button></p>';
         var tdHtml = "";
         var contextMenu = '<ul id="example1-context-menu" class="dropdown-menu"> \
+                             <li data-item="create"><a>Create</a></li> \
                              <li data-item="update"><a>Update</a></li> \
                              <li data-item="delete"><a>Delete</a></li> \
                            </ul>';
@@ -132,16 +131,20 @@ function ($,
         html += tdHtml;
         $(tableDiv).append(html);
         $(contextMenuDiv).append(contextMenu);
+        $('#main-create').on('click', renderCreateUserForm);
 
         $('#rest-password-table').bootstrapTable({
             contextMenu: '#example1-context-menu',
             onContextMenuItem: function(row, $el){
-                if($el.data("item") == "update"){
-                    $('#create-user').hide();
-                    $('#update-user').show();
-                    $('input[id=updateUsername]').val(row[0]);
-                    $('input[id=updateRealm]').val(row[2]);
-                    $('input[id=updateApp]').val(row[3]);
+                if($el.data("item") == "create") {
+                    renderCreateUserForm();
+                } else if($el.data("item") == "update"){
+                    //$('#create-user').hide();
+                    //$('#update-user').show();
+                    //$('input[id=updateUsername]').val(row[0]);
+                    //$('input[id=updateRealm]').val(row[2]);
+                    //$('input[id=updateApp]').val(row[3]);
+                    renderUpdateUserForm(row);
                 } else if($el.data("item") == "delete"){
                     deleteCredential(row, tableDiv);
                 }
@@ -149,7 +152,7 @@ function ($,
         });
     }
 
-    function renderModal(id, title, body, buttonText, callback) {
+    function renderModal(id, title, body, buttonText, callback, callbackArgs=null) {
         var myModal = new Modal(id, {
                  title: title,
                  destroyOnHide: true,
@@ -173,38 +176,19 @@ function ($,
         myModal.footer.append($('<button>').attr({
             type: 'button',
             'data-dismiss': 'modal'
-        }).addClass('btn btn-primary mlts-modal-submit').text(buttonText).on('click', callback))
-
+        //}).addClass('btn btn-primary mlts-modal-submit').text(buttonText).on('click', callback.apply(this, callbackArgs)))
+        }).addClass('btn btn-primary mlts-modal-submit').text(buttonText).on('click', function () { 
+                if(callbackArgs) {
+                    callback.apply(this, callbackArgs);
+                } else { 
+                    callback();
+                }
+            }))
         myModal.show(); // Launch it!  
     }   
 
     function renderCreateUserForm() {
-        var html = '<h1>Create User</h1> \
-                      <p>Right click on row to update or delete credentials.</p> \
-                      <form id="createCredential"> \
-                        <div class="form-group"> \
-                          <label for="username">Username</label> \
-                          <input type="username" class="form-control" id="createUsername" placeholder="Enter username"> \
-                        </div> \
-                        <p></p> \
-                        <div class="form-group"> \
-                          <label for="password">Password</label> \
-                          <input type="password" class="form-control" id="createPassword" placeholder="Password"> \
-                        </div> \
-                        <div> \
-                          <label for="confirmPassword">Confirm Password</label> \
-                          <input type="password" class="form-control" id="createConfirmPassword" placeholder="Confirm Password"> \
-                        </div> \
-                        <div class="form-group"> \
-                          <label for="realm">Realm</label> \
-                          <input type="realm" class="form-control" id="createRealm" placeholder="Realm"> \
-                          <br></br>\
-                        </div> \
-                        <button type="submit" class="btn btn-primary">Create</button> \
-                      </form>'
-        $('#create-user').append(html);
-
-        $( "#createCredential" ).submit(function( event ) {
+        var createUser = function createUser() {
             event.preventDefault();
             var username = $('input[id=createUsername]').val();
             var password = $('input[id=createPassword]').val();
@@ -217,15 +201,15 @@ function ($,
 
             if(password != confirmPassword) {
                 return renderModal("password-mismatch",
-                                   "Password Mismatch",
-                                   "<p>Passwords do not match</b>",
-                                   "Close",
-                                   function(){return});
+                                    "Password Mismatch",
+                                    "<p>Passwords do not match</b>",
+                                    "Close",
+                                    renderCreateUserForm);
             } else {
                 var currentUser = Splunk.util.getConfigValue("USERNAME");      
                 var app = utils.getCurrentApp();
                 var url = "/en-US/splunkd/__raw/servicesNS/" + currentUser + "/" + app + "/storage/passwords";
-
+                
                 $.ajax({
                     type: "POST",
                     url: url,
@@ -245,41 +229,48 @@ function ($,
                                     "Close",
                                     function() {return});
                     }
-                });
+                })
             }
-        });
+        }
+
+        var html = '<form id="createCredential"> \
+                        <div class="form-group"> \
+                          <label for="username">Username</label> \
+                          <input type="username" class="form-control" id="createUsername" placeholder="Enter username"> \
+                        </div> \
+                        <p></p> \
+                        <div class="form-group"> \
+                          <label for="password">Password</label> \
+                          <input type="password" class="form-control" id="createPassword" placeholder="Password"> \
+                        </div> \
+                        <div> \
+                          <label for="confirmPassword">Confirm Password</label> \
+                          <input type="password" class="form-control" id="createConfirmPassword" placeholder="Confirm Password"> \
+                        </div> \
+                        <div class="form-group"> \
+                          <label for="realm">Realm</label> \
+                          <input type="realm" class="form-control" id="createRealm" placeholder="Realm"> \
+                          <br></br>\
+                        </div> \
+                      </form>'
+
+        renderModal("create-user-form",
+            "Create User",
+            html,
+            "Create",
+            createUser);
     }
 
-    function renderUpdateUserForm() {
-        var html = '<h1>Update User</h1> \
-                    <form id="updateCredential"> \
-                      <div class="form-group"> \
-                        <label for="username">Username</label> \
-                        <input type="username" class="form-control" id="updateUsername" placeholder="Enter username"> \
-                      </div> \
-                      <p></p> \
-                      <div class="form-group"> \
-                        <label for="password">Password</label> \
-                        <input type="password" class="form-control" id="updatePassword" placeholder="Password"> \
-                      </div> \
-                      <div> \
-                        <label for="confirmPassword">Confirm Password</label> \
-                        <input type="password" class="form-control" id="updateConfirmPassword" placeholder="Confirm Password"> \
-                      </div> \
-                      <div class="form-group"> \
-                        <label for="realm">Realm</label> \
-                        <input type="realm" class="form-control" id="updateRealm" placeholder="Realm"> \
-                        <br></br> \
-                      </div> \
-                      <div class="form-group"> \
-                        <input type="hidden" class="form-control" id="updateApp"> \
-                      </div> \
-                      <button type="submit" class="btn btn-primary">Update</button> \
-                    </form>'
-        $('#update-user').append(html).hide();
+    //var html = '<h1>Update User</h1><form id="updateCredential"> <div class="form-group"><label for="username">Username</label> <input type="username" class="form-control" id="updateUsername" placeholder="Enter username"></div><p></p><div class="form-group"> <label for="password">Password</label> <input type="password" class="form-control" id="updatePassword" placeholder="Password"> </div> <label for="confirmPassword">Confirm Password</label> <input type="password" class="form-control" id="updateConfirmPassword" placeholder="Confirm Password"> </div> <div class="form-group"> <label for="realm">Realm</label> <input type="realm" class="form-control" id="updateRealm" placeholder="Realm"><br></br></div> <div class="form-group"> <input type="hidden" class="form-control" id="updateApp"></div><button type="submit" class="btn btn-primary">Update</button> </form>'
 
-        $( "#updateCredential" ).submit(function( event ) {
+    function renderUpdateUserForm(row) {
+        var updateUser = function updateUser () {
+            //$( "#updateCredential" ).submit(function( event ) {
             event.preventDefault();
+            $('input[id=updateUsername]').val(row[0]);
+            $('input[id=updateRealm]').val(row[2]);
+            $('input[id=updateApp]').val(row[3]);
+
             var username = $('input[id=updateUsername]').val();
             var password = $('input[id=updatePassword]').val();
             var confirmPassword = $('input[id=updateConfirmPassword]').val();
@@ -293,39 +284,68 @@ function ($,
                             "Password Mismatch",
                             "<p>Passwords do not match. Please re-enter.<p>",
                             "Close",
-                            function() { return false }); 
-        } else {
-            var currentUser = Splunk.util.getConfigValue("USERNAME");      
-            var url = "/en-US/splunkd/__raw/servicesNS/" + currentUser + "/" + app + "/storage/passwords/" + realm + ":" + username;
-
-            $.ajax({
-                type: "POST",
-                url: url,
-                data: formData,
-                success: function() {
-                    renderModal("password-updated",
-                                "Password Updated",
-                                "<p>Password successfully updated for user" + username + ":" + app + "</p>",
-                                "Close",
-                                refreshWindow);
-                    //alert("Successfully update password for user " + username + ":" + realm);
-                },
-                error: function(e) {
-                    console.log(e);
-                    renderModal("password-updated",
-                                "Password Updated",
-                                "<p>Failed to update password for user " + username + ". See console for details</p>",
-                                "Close",
-                                refreshWindow);
-                }
-            });
+                            renderUpdateUserForm,
+                            [row]); 
+            } else {
+                var currentUser = Splunk.util.getConfigValue("USERNAME");      
+                var url = "/en-US/splunkd/__raw/servicesNS/" + currentUser + "/" + app + "/storage/passwords/" + realm + ":" + username;
+    
+                $.ajax({
+                    type: "POST",
+                    url: url,
+                    data: formData,
+                    success: function() {
+                        renderModal("password-updated",
+                                    "Password Updated",
+                                    "<p>Password successfully updated for user" + username + ":" + app + "</p>",
+                                    "Close",
+                                    refreshWindow);
+                        //alert("Successfully update password for user " + username + ":" + realm);
+                    },
+                    error: function(e) {
+                        console.log(e);
+                        renderModal("password-updated",
+                                    "Password Updated",
+                                    "<p>Failed to update password for user " + username + ". See console for details</p>",
+                                    "Close",
+                                    refreshWindow);
+                    }
+                });
+            }
+            //});
         }
-        });
+        var html = '<h1>Update User</h1> \
+                    <form id="updateCredential"> \
+                      <div class="form-group"> \
+                        <input type="hidden" class="form-control" id="updateUsername"> \
+                      </div> \
+                      <p></p> \
+                      <div class="form-group"> \
+                        <label for="password">Password</label> \
+                        <input type="password" class="form-control" id="updatePassword" placeholder="Password"> \
+                      </div> \
+                      <div> \
+                        <label for="confirmPassword">Confirm Password</label> \
+                        <input type="password" class="form-control" id="updateConfirmPassword" placeholder="Confirm Password"> \
+                      </div> \
+                      <div> \
+                        <input type="hidden" class="form-control" id="updateRealm"> \
+                      </div> \
+                      <div class="form-group"> \
+                        <input type="hidden" class="form-control" id="updateApp"> \
+                      </div> \
+                    </form>'
+
+        renderModal("update-user-form",
+                    "Update User",
+                    html,
+                    "Update",
+                    updateUser);
+        
     }
 
-
-    renderCreateUserForm();
-    renderUpdateUserForm();
+    //renderCreateUserForm();
+    //renderUpdateUserForm();
 
     var contextMenuDiv = '#context-menu';
     var passwordTableDiv = '#password-table';
