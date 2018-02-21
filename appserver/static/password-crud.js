@@ -7,6 +7,7 @@ require(['jquery',
         'splunkjs/mvc/tokenutils',
         'splunkjs/mvc/messages',
         'splunkjs/mvc/searchmanager',
+        '/static/app/TA-zenoss/Modal.js',
         'splunkjs/mvc/simplexml/ready!'],
 function ($,
           _,
@@ -14,7 +15,8 @@ function ($,
           utils,
           TokenUtils,
           Messages,
-          SearchManager) {
+          SearchManager,
+          Modal) {
 
     function runSearch() {
         var search1 = new SearchManager({
@@ -56,24 +58,39 @@ function ($,
         });
     }
 
+    function refreshWindow() {
+        location.reload()
+        $('#create-user').show();
+    }
+
     function deleteCredential(row, tableDiv) {
         var username=Splunk.util.getConfigValue("USERNAME");      
         var url = "/en-US/splunkd/__raw/servicesNS/" + username + "/" + row[3] + "/storage/passwords/" + row[2] + ":" + row[0] +":";
-        var deleteUser= confirm("You're about to the password for user " + row[0] + ":" + row[2] + " - Press ok to continue");
 
-        if(deleteUser) { 
+
+        var removeUser = function () {
             $.ajax({
                 type: "DELETE",
                 url: url,
                 success: function() {
-                    alert("Successfully deleted user " + row[0] + ":" + row[2]);
-                    location.reload(); 
+                    renderModal("user-deleted",
+                                "User Deleted",
+                                "<p>Successfully deleted user " + row[0] + ":" + row[2] + "</p>",
+                                "Close",
+                                refreshWindow) 
                 },
                 error: function() {
                     alert("Failed to delete user " + row[0] + ". See console for details");
                 }
             });
         }
+
+        var deleteUser = renderModal("user-delete-confirm",
+                    "Confirm Delete Action",
+                    "<p>You're about to remove the user " + row[0] + ":" + row[2] + " - Press ok to continue</p>",
+                    "Ok",
+                    removeUser); 
+        console.log("deleting user" + deleteUser);
     }
 
     function createTable(tableDiv, contextMenuDiv, data) {
@@ -109,6 +126,52 @@ function ($,
         });
     }
 
+    function renderModal(id, title, body, buttonText, callback) {
+        var myModal = new Modal(id, {
+                 title: title,
+                 destroyOnHide: true,
+                 type: 'wide'
+        }); 
+
+        var hold = function () {
+            if(reload == true) {
+                location.reload();
+            }
+            console.log("returning");
+            return true;
+        }
+
+        console.log(myModal);
+        $(myModal.$el).on("hide", function(){
+            // Not taking any action on hide, but you can if you want to!
+        })
+ 
+        myModal.body.append($(body));
+ 
+        myModal.footer.append($('<button>').attr({
+            type: 'button',
+            'data-dismiss': 'modal'
+        }).addClass('btn btn-primary mlts-modal-submit').text(buttonText).on('click', callback))
+
+        /*
+        }).addClass('btn btn-primary mlts-modal-submit').text(buttonText).on('click', function () {
+            // Not taking any action on Close... but I could!        
+        }))  
+        */
+
+        /*
+        $(myModal.$el).promise().done(function() {
+            if(reload == true) {
+                location.reload();
+            }
+            console.log("returning");
+            return true;
+        });
+        */
+
+        myModal.show(); // Launch it!  
+    }   
+
     function renderCreateUserForm() {
         var html = '<h1>Create User</h1><p>Right click on row to update or delete credentials.</p><form id="createCredential"> <div class="form-group"><label for="username">Username</label> <input type="username" class="form-control" id="createUsername" placeholder="Enter username"></div><p></p><div class="form-group"> <label for="password">Password</label> <input type="password" class="form-control" id="createPassword" placeholder="Password"></div><label for="confirmPassword">Confirm Password</label> <input type="password" class="form-control" id="createConfirmPassword" placeholder="Confirm Password"> </div> <div class="form-group"> <label for="realm">Realm</label> <input type="realm" class="form-control" id="createRealm" placeholder="Realm"><br></br></div> <button type="submit" class="btn btn-primary">Create</button> </form>'
         $('#create-user').append(html);
@@ -125,27 +188,37 @@ function ($,
                             "realm": realm};
 
             if(password != confirmPassword) {
-                return alert("Passwords do not match");
+                return renderModal("password-mismatch",
+                                   "Password Mismatch",
+                                   "<p>Passwords do not match</b>",
+                                   "Close",
+                                   function(){return});
+            } else {
+                var currentUser = Splunk.util.getConfigValue("USERNAME");      
+                var app = utils.getCurrentApp();
+                var url = "/en-US/splunkd/__raw/servicesNS/" + currentUser + "/" + app + "/storage/passwords";
+
+                $.ajax({
+                    type: "POST",
+                    url: url,
+                    data: formData,
+                    success: function() {
+                        renderModal("user-added",
+                                    "User Created",
+                                    "<p>Successfully created user " + username + ":" + realm + "</p>",
+                                    "Close",
+                                    refreshWindow);
+                    },
+                    error: function(e) {
+                        console.log(e);
+                        renderModal("user-add-fail",
+                                    "Failed User Creation",
+                                    "<p>Failed to create user " + username + ":" + realm + "</p>",
+                                    "Close",
+                                    function() {return});
+                    }
+                });
             }
-
-
-            var currentUser = Splunk.util.getConfigValue("USERNAME");      
-            var app = utils.getCurrentApp();
-            var url = "/en-US/splunkd/__raw/servicesNS/" + currentUser + "/" + app + "/storage/passwords";
-
-            $.ajax({
-                type: "POST",
-                url: url,
-                data: formData,
-                success: function() {
-                    alert("Successfully added user " + username + ":" + realm);
-                    location.reload(); 
-                },
-                error: function(e) {
-                    console.log(e);
-                    alert("Failed to add user " + username + ". See console for details");
-                }
-            });
         });
     }
 
@@ -164,9 +237,12 @@ function ($,
             var formData = {"password": password};
 
             if(password != confirmPassword) {
-                return alert("Passwords do not match");
-            }
-
+                renderModal("password-mismatch",
+                            "Password Mismatch",
+                            "<p>Passwords do not match. Please re-enter.<p>",
+                            "Close",
+                            function() { return false }); 
+        } else {
             var currentUser = Splunk.util.getConfigValue("USERNAME");      
             var url = "/en-US/splunkd/__raw/servicesNS/" + currentUser + "/" + app + "/storage/passwords/" + realm + ":" + username;
 
@@ -175,18 +251,30 @@ function ($,
                 url: url,
                 data: formData,
                 success: function() {
-                    alert("Successfully update password for user " + username + ":" + realm);
-                    location.reload(); 
+                    renderModal("password-updated",
+                                "Password Updated",
+                                "<p>Password successfully updated for user" + username + ":" + app + "</p>",
+                                "Close",
+                                refreshWindow);
+                    //alert("Successfully update password for user " + username + ":" + realm);
                 },
                 error: function(e) {
                     console.log(e);
-                    alert("Failed to update password for user " + username + ". See console for details");
+                    renderModal("password-updated",
+                                "Password Updated",
+                                "<p>Failed to update password for user " + username + ". See console for details</p>",
+                                "Close",
+                                refreshWindow);
                 }
             });
+        }
         });
     }
+
+
     renderCreateUserForm();
     renderUpdateUserForm();
+
     var contextMenuDiv = '#context-menu';
     var passwordTableDiv = '#password-table';
     
