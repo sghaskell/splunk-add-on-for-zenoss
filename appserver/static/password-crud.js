@@ -18,6 +18,7 @@ function ($,
           SearchManager,
           Modal) {
 
+    /* Run Search */
     function runSearch() {
         var search1 = new SearchManager({
                 "id": "search1",
@@ -26,7 +27,9 @@ function ($,
                 "earliest_time": "-24h@h",
                 "latest_time": "now",
                 "sample_ratio": 1,
-                "search": "| rest /services/storage/passwords | table username, password, realm, clear_password, eai:acl.app | rename eai:acl.app as app",
+                "search": "| rest /services/storage/passwords \
+                  | table username, password, realm, clear_password, eai:acl.app \
+                  | rename eai:acl.app as app",
                 "app": utils.getCurrentApp(),
                 "auto_cancel": 90,
                 "preview": true,
@@ -58,6 +61,7 @@ function ($,
         });
     }
 
+    // Callback to refresh window and hide create-user
     function refreshWindow() {
         location.reload()
         $('#create-user').show();
@@ -98,12 +102,31 @@ function ($,
         console.log(data);
         var html = "";
         var tdHtml = "";
-        var contextMenu = '<ul id="example1-context-menu" class="dropdown-menu"><li data-item="update"><a>Update</a></li><li data-item="delete"><a>Delete</a></li></ul>';
-        var header = '<table id="rest-password-table" class="table table-striped dashboard-element table-hover">' + '<thead class="thead-default"><tr><th style><div class="th-inner "><h3>Username</h3></div><div class="fht-cell"></div></th>' + '<th style><div class="th-inner "><h3>Password</h3></div><div class="fht-cell"></div></th>' + '<th style><div class="th-inner "><h3><h3>Realm</h3></div><div class="fht-cell"></div></th>' + '<th style><div class="th-inner "><h3>App</h3></div><div class="fht-cell"></div></th>' + '<th style><div class="th-inner "><h3>Clear Password</h3></div><div class="fht-cell"></div></th></tr></thead><tbody>';
+        var contextMenu = '<ul id="example1-context-menu" class="dropdown-menu"> \
+                             <li data-item="update"><a>Update</a></li> \
+                             <li data-item="delete"><a>Delete</a></li> \
+                           </ul>';
+        var header = '<table id="rest-password-table" class="table table-striped dashboard-element table-hover"> \
+                      <thead class="thead-default"> \
+                        <tr> \
+                            <th style><div class="th-inner "><h3>Username</h3></div><div class="fht-cell"></div></th> \
+                            <th style><div class="th-inner "><h3>Password</h3></div><div class="fht-cell"></div></th> \
+                            <th style><div class="th-inner "><h3><h3>Realm</h3></div><div class="fht-cell"></div></th> \
+                            <th style><div class="th-inner "><h3>App</h3></div><div class="fht-cell"></div></th> \
+                            <th style><div class="th-inner "><h3>Clear Password</h3></div><div class="fht-cell"></div></th> \
+                        </tr> \
+                      </thead> \
+                      <tbody>';
         html += header;
         _.each(data, function(row, i) {
             console.log(row);
-            tdHtml += '<tr class="striped" data-index="' + i + '"><td style>' + row.username + '</td>' + '<td style>' + row.password + '</td><td style>' + row.realm + '</td><td style>' + row.app + '</td><td style>' + row.clear_password + '</td></tr>';
+            tdHtml += '<tr class="striped" data-index="' + i + '"> \
+                         <td style>' + row.username + '</td> \
+                         <td style>' + row.password + '</td> \
+                         <td style>' + row.realm + '</td> \
+                         <td style>' + row.app + '</td> \
+                         <td style>' + row.clear_password + '</td> \
+                       </tr>';
         });
         tdHtml += "</tbody></table";
         html += tdHtml;
@@ -141,7 +164,6 @@ function ($,
             return true;
         }
 
-        console.log(myModal);
         $(myModal.$el).on("hide", function(){
             // Not taking any action on hide, but you can if you want to!
         })
@@ -153,27 +175,33 @@ function ($,
             'data-dismiss': 'modal'
         }).addClass('btn btn-primary mlts-modal-submit').text(buttonText).on('click', callback))
 
-        /*
-        }).addClass('btn btn-primary mlts-modal-submit').text(buttonText).on('click', function () {
-            // Not taking any action on Close... but I could!        
-        }))  
-        */
-
-        /*
-        $(myModal.$el).promise().done(function() {
-            if(reload == true) {
-                location.reload();
-            }
-            console.log("returning");
-            return true;
-        });
-        */
-
         myModal.show(); // Launch it!  
     }   
 
     function renderCreateUserForm() {
-        var html = '<h1>Create User</h1><p>Right click on row to update or delete credentials.</p><form id="createCredential"> <div class="form-group"><label for="username">Username</label> <input type="username" class="form-control" id="createUsername" placeholder="Enter username"></div><p></p><div class="form-group"> <label for="password">Password</label> <input type="password" class="form-control" id="createPassword" placeholder="Password"></div><label for="confirmPassword">Confirm Password</label> <input type="password" class="form-control" id="createConfirmPassword" placeholder="Confirm Password"> </div> <div class="form-group"> <label for="realm">Realm</label> <input type="realm" class="form-control" id="createRealm" placeholder="Realm"><br></br></div> <button type="submit" class="btn btn-primary">Create</button> </form>'
+        var html = '<h1>Create User</h1> \
+                      <p>Right click on row to update or delete credentials.</p> \
+                      <form id="createCredential"> \
+                        <div class="form-group"> \
+                          <label for="username">Username</label> \
+                          <input type="username" class="form-control" id="createUsername" placeholder="Enter username"> \
+                        </div> \
+                        <p></p> \
+                        <div class="form-group"> \
+                          <label for="password">Password</label> \
+                          <input type="password" class="form-control" id="createPassword" placeholder="Password"> \
+                        </div> \
+                        <div> \
+                          <label for="confirmPassword">Confirm Password</label> \
+                          <input type="password" class="form-control" id="createConfirmPassword" placeholder="Confirm Password"> \
+                        </div> \
+                        <div class="form-group"> \
+                          <label for="realm">Realm</label> \
+                          <input type="realm" class="form-control" id="createRealm" placeholder="Realm"> \
+                          <br></br>\
+                        </div> \
+                        <button type="submit" class="btn btn-primary">Create</button> \
+                      </form>'
         $('#create-user').append(html);
 
         $( "#createCredential" ).submit(function( event ) {
@@ -223,7 +251,31 @@ function ($,
     }
 
     function renderUpdateUserForm() {
-        var html = '<h1>Update User</h1><form id="updateCredential"> <div class="form-group"><label for="username">Username</label> <input type="username" class="form-control" id="updateUsername" placeholder="Enter username"></div><p></p><div class="form-group"> <label for="password">Password</label> <input type="password" class="form-control" id="updatePassword" placeholder="Password"> </div> <label for="confirmPassword">Confirm Password</label> <input type="password" class="form-control" id="updateConfirmPassword" placeholder="Confirm Password"> </div> <div class="form-group"> <label for="realm">Realm</label> <input type="realm" class="form-control" id="updateRealm" placeholder="Realm"><br></br></div> <div class="form-group"> <input type="hidden" class="form-control" id="updateApp"></div><button type="submit" class="btn btn-primary">Update</button> </form>'
+        var html = '<h1>Update User</h1> \
+                    <form id="updateCredential"> \
+                      <div class="form-group"> \
+                        <label for="username">Username</label> \
+                        <input type="username" class="form-control" id="updateUsername" placeholder="Enter username"> \
+                      </div> \
+                      <p></p> \
+                      <div class="form-group"> \
+                        <label for="password">Password</label> \
+                        <input type="password" class="form-control" id="updatePassword" placeholder="Password"> \
+                      </div> \
+                      <div> \
+                        <label for="confirmPassword">Confirm Password</label> \
+                        <input type="password" class="form-control" id="updateConfirmPassword" placeholder="Confirm Password"> \
+                      </div> \
+                      <div class="form-group"> \
+                        <label for="realm">Realm</label> \
+                        <input type="realm" class="form-control" id="updateRealm" placeholder="Realm"> \
+                        <br></br> \
+                      </div> \
+                      <div class="form-group"> \
+                        <input type="hidden" class="form-control" id="updateApp"> \
+                      </div> \
+                      <button type="submit" class="btn btn-primary">Update</button> \
+                    </form>'
         $('#update-user').append(html).hide();
 
         $( "#updateCredential" ).submit(function( event ) {
