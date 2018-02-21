@@ -118,7 +118,6 @@ function ($,
                       <tbody>';
         html += header;
         _.each(data, function(row, i) {
-            console.log(row);
             tdHtml += '<tr class="striped" data-index="' + i + '"> \
                          <td style>' + row.username + '</td> \
                          <td style>' + row.password + '</td> \
@@ -139,11 +138,6 @@ function ($,
                 if($el.data("item") == "create") {
                     renderCreateUserForm();
                 } else if($el.data("item") == "update"){
-                    //$('#create-user').hide();
-                    //$('#update-user').show();
-                    //$('input[id=updateUsername]').val(row[0]);
-                    //$('input[id=updateRealm]').val(row[2]);
-                    //$('input[id=updateApp]').val(row[3]);
                     renderUpdateUserForm(row);
                 } else if($el.data("item") == "delete"){
                     deleteCredential(row, tableDiv);
@@ -176,7 +170,6 @@ function ($,
         myModal.footer.append($('<button>').attr({
             type: 'button',
             'data-dismiss': 'modal'
-        //}).addClass('btn btn-primary mlts-modal-submit').text(buttonText).on('click', callback.apply(this, callbackArgs)))
         }).addClass('btn btn-primary mlts-modal-submit').text(buttonText).on('click', function () { 
                 if(callbackArgs) {
                     callback.apply(this, callbackArgs);
@@ -261,11 +254,8 @@ function ($,
             createUser);
     }
 
-    //var html = '<h1>Update User</h1><form id="updateCredential"> <div class="form-group"><label for="username">Username</label> <input type="username" class="form-control" id="updateUsername" placeholder="Enter username"></div><p></p><div class="form-group"> <label for="password">Password</label> <input type="password" class="form-control" id="updatePassword" placeholder="Password"> </div> <label for="confirmPassword">Confirm Password</label> <input type="password" class="form-control" id="updateConfirmPassword" placeholder="Confirm Password"> </div> <div class="form-group"> <label for="realm">Realm</label> <input type="realm" class="form-control" id="updateRealm" placeholder="Realm"><br></br></div> <div class="form-group"> <input type="hidden" class="form-control" id="updateApp"></div><button type="submit" class="btn btn-primary">Update</button> </form>'
-
     function renderUpdateUserForm(row) {
         var updateUser = function updateUser () {
-            //$( "#updateCredential" ).submit(function( event ) {
             event.preventDefault();
             $('input[id=updateUsername]').val(row[0]);
             $('input[id=updateRealm]').val(row[2]);
@@ -300,7 +290,6 @@ function ($,
                                     "<p>Password successfully updated for user" + username + ":" + app + "</p>",
                                     "Close",
                                     refreshWindow);
-                        //alert("Successfully update password for user " + username + ":" + realm);
                     },
                     error: function(e) {
                         console.log(e);
@@ -343,9 +332,6 @@ function ($,
                     updateUser);
         
     }
-
-    //renderCreateUserForm();
-    //renderUpdateUserForm();
 
     var contextMenuDiv = '#context-menu';
     var passwordTableDiv = '#password-table';
