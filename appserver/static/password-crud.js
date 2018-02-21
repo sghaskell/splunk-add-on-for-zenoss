@@ -307,8 +307,7 @@ function ($,
             }
             //});
         }
-        var html = '<h1>Update User</h1> \
-                    <form id="updateCredential"> \
+        var html = '<form id="updateCredential"> \
                       <div class="form-group"> \
                         <input type="hidden" class="form-control" id="updateUsername"> \
                       </div> \
