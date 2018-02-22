@@ -100,6 +100,15 @@ function ($,
         console.log("deleting user" + deleteUser);
     }
 
+    function showPassword(row) {
+        console.log("hey now");
+        console.log(row);
+        renderModal("show-password",
+                    "Clear Password",
+                    "<p>" + row.clear_password + "</p>",
+                    "Close");
+    }
+
     function createTable(tableDiv, contextMenuDiv, data) {
         var html = '<p> Click <b>Create</b> to add a user or right click on a row to create, update or delete.</p> \
                     <p><button id="main-create" class="btn btn-primary">Create</button></p>';
@@ -108,31 +117,34 @@ function ($,
                              <li data-item="create"><a>Create</a></li> \
                              <li data-item="update"><a>Update</a></li> \
                              <li data-item="delete"><a>Delete</a></li> \
+                             <li data-item="show"><a>Show Password</a></li> \
                            </ul>';
-        var header = '<table id="rest-password-table" class="table table-striped dashboard-element table-hover"> \
-                      <thead class="thead-default"> \
+        var header = '<table id="rest-password-table" class="table-striped dashboard-element table-hover"> \
+                      <thead> \
                         <tr> \
-                            <th style><div class="th-inner "><h3>Username</h3></div><div class="fht-cell"></div></th> \
-                            <th style><div class="th-inner "><h3>Password</h3></div><div class="fht-cell"></div></th> \
-                            <th style><div class="th-inner "><h3><h3>Realm</h3></div><div class="fht-cell"></div></th> \
-                            <th style><div class="th-inner "><h3>App</h3></div><div class="fht-cell"></div></th> \
-                            <th style><div class="th-inner "><h3>Clear Password</h3></div><div class="fht-cell"></div></th> \
+                            <th data-field="username"><div><h3>Username</h3></div></th> \
+                            <th data-field="password"><div><h3>Password</h3></div></th> \
+                            <th data-field="realm"><div><h3><h3>Realm</h3></div></th> \
+                            <th data-field="app"><div><h3>App</h3></div></th> \
+                            <th data-field="clear_password" data-visible="false"><div><h3>Clear Password</h3></div></th> \
                         </tr> \
                       </thead> \
                       <tbody>';
         html += header;
         _.each(data, function(row, i) {
-            tdHtml += '<tr class="striped" data-index="' + i + '"> \
-                         <td style>' + row.username + '</td> \
-                         <td style>' + row.password + '</td> \
-                         <td style>' + row.realm + '</td> \
-                         <td style>' + row.app + '</td> \
-                         <td style>' + row.clear_password + '</td> \
+            tdHtml += '<tr class="striped"> \
+                         <td>' + row.username + '</td> \
+                         <td>' + row.password + '</td> \
+                         <td>' + row.realm + '</td> \
+                         <td>' + row.app + '</td> \
+                         <td>' + row.clear_password + '</td> \
                        </tr>';
         });
-        tdHtml += "</tbody></table";
+        
+        tdHtml += "</tbody></table>";
         html += tdHtml;
         $(tableDiv).append(html);
+        
         $(contextMenuDiv).append(contextMenu);
         $('#main-create').on('click', renderCreateUserForm);
 
@@ -145,6 +157,8 @@ function ($,
                     renderUpdateUserForm(row);
                 } else if($el.data("item") == "delete"){
                     deleteCredential(row, tableDiv);
+                } else if($el.data("item") == "show"){
+                    showPassword(row);
                 }
             }
         });
