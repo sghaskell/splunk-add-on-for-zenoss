@@ -39,7 +39,7 @@ function ($,
         var myModal = new Modal(id, {
                     title: title,
                     destroyOnHide: true,
-                    type: 'wide'
+                    type: 'normal'
         }); 
 
         var hold = function () {
@@ -59,12 +59,8 @@ function ($,
         myModal.footer.append($('<button>').attr({
             type: 'button',
             'data-dismiss': 'modal'
-        }).addClass('btn btn-primary mlts-modal-submit').text(buttonText).on('click', function () { 
-                if(callbackArgs) {
-                    callback.apply(this, callbackArgs);
-                } else { 
-                    callback();
-                }
+        }).addClass('btn btn-primary mlts-modal-submit').text(buttonText).on('click', function () {
+                anonCallback(callback, callbackArgs); 
             }))
         myModal.show(); // Launch it!  
     }
@@ -82,8 +78,8 @@ function ($,
                 "latest_time": "now",
                 "sample_ratio": 1,
                 "search": "| rest /services/storage/passwords \
-                  | table username, password, realm, clear_password, eai:acl.app \
-                  | rename eai:acl.app as app",
+                           | table username, password, realm, clear_password, eai:acl.app \
+                           | rename eai:acl.app as app",
                 "app": utils.getCurrentApp(),
                 "auto_cancel": 90,
                 "preview": true,
@@ -124,13 +120,23 @@ function ($,
                              <li data-item="delete"><a>Delete</a></li> \
                              <li data-item="show"><a>Show Password</a></li> \
                            </ul>';
-        var header = '<table id="rest-password-table" class="table-striped dashboard-element table-hover"> \
+        var header = '<table id="rest-password-table" \
+                             class="table table-striped table-hover" \
+                             data-toolbar="#toolbar" \
+                             data-sort-name="username" \
+                             data-show-pagination-switch="true" \
+                             data-pagination="true" \
+                             data-sortable="true" \
+                             data-page-size="10" \
+                             data-smart-display="true" \
+                             data-search="true" \
+                             data-show-footer="false"> \
                       <thead> \
                         <tr> \
-                            <th data-field="username"><div><h3>Username</h3></div></th> \
+                            <th data-field="username" data-sortable="true"><div><h3>Username</h3></div></th> \
                             <th data-field="password"><div><h3>Password</h3></div></th> \
-                            <th data-field="realm"><div><h3><h3>Realm</h3></div></th> \
-                            <th data-field="app"><div><h3>App</h3></div></th> \
+                            <th data-field="realm" data-sortable="true"><div><h3><h3>Realm</h3></div></th> \
+                            <th data-field="app" data-sortable="true"><div><h3>App</h3></div></th> \
                             <th data-field="clear_password" data-visible="false"><div><h3>Clear Password</h3></div></th> \
                         </tr> \
                       </thead> \
