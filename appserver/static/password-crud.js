@@ -300,10 +300,8 @@ function ($,
             [cUsername, cRealm]);
     
         setTimeout(function () {
-            if(cUsername != "" || (cUsername != "" && cRealm != "")) {
-                console.log("setting username and realm");
-                console.log(cUsername);
-                console.log(cRealm);
+            //if(cUsername != "" || (cUsername != "" && cRealm != "")) {
+            if(cUsername != "" || cRealm != "") {
                 $('input[id=createUsername]').val(cUsername);
                 $('input[id=createRealm]').val(cRealm);
             }
