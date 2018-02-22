@@ -275,9 +275,9 @@ function ($,
     function renderUpdateUserForm(row) {
         var updateUser = function updateUser () {
             event.preventDefault();
-            $('input[id=updateUsername]').val(row[0]);
-            $('input[id=updateRealm]').val(row[2]);
-            $('input[id=updateApp]').val(row[3]);
+            $('input[id=updateUsername]').val(row.username);
+            $('input[id=updateRealm]').val(row.realm);
+            $('input[id=updateApp]').val(row.app);
 
             var username = $('input[id=updateUsername]').val();
             var password = $('input[id=updatePassword]').val();
@@ -287,6 +287,14 @@ function ($,
 
             var formData = {"password": password};
 
+            if(password == "") {
+                return renderModal("password-missing",
+                                   "Empty Password",
+                                   "<p>Empty password. Please re-enter<p>",
+                                   "Close",
+                                   renderUpdateUserForm,
+                                   [row]);
+            }
             if(password != confirmPassword) {
                 renderModal("password-mismatch",
                             "Password Mismatch",
@@ -295,8 +303,10 @@ function ($,
                             renderUpdateUserForm,
                             [row]); 
             } else {
-                var currentUser = Splunk.util.getConfigValue("USERNAME");      
+                var currentUser = Splunk.util.getConfigValue("USERNAME"); 
+                console.log(row);     
                 var url = "/en-US/splunkd/__raw/servicesNS/" + currentUser + "/" + app + "/storage/passwords/" + realm + ":" + username;
+                console.log(url);
     
                 $.ajax({
                     type: "POST",
@@ -313,7 +323,7 @@ function ($,
                         console.log(e);
                         renderModal("password-updated",
                                     "Password Updated",
-                                    "<p>Failed to update password for user " + username + ". See console for details</p>",
+                                    "<p>Failed to update password for user " + username + ". " + e.responseText,
                                     "Close",
                                     refreshWindow);
                     }
