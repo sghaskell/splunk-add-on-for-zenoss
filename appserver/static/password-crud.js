@@ -27,6 +27,14 @@ function ($,
                     "Close");
     }
 
+    function anonCallback(callback=function(){}, callbackArgs=null) {
+        if(callbackArgs) {
+            callback.apply(this, callbackArgs);
+        } else { 
+            callback();
+        }
+    }
+
     function renderModal(id, title, body, buttonText, callback=function(){}, callbackArgs=null) {
         var myModal = new Modal(id, {
                     title: title,
@@ -143,7 +151,7 @@ function ($,
         $(tableDiv).append(html);
         
         $(contextMenuDiv).append(contextMenu);
-        $('#main-create').on('click', renderCreateUserForm);
+        $('#main-create').on('click', function () { anonCallback(renderCreateUserForm, ["",""])});
 
         $('#rest-password-table').bootstrapTable({
             contextMenu: '#example1-context-menu',
@@ -187,16 +195,16 @@ function ($,
         }
 
         var deleteUser = renderModal("user-delete-confirm",
-                    "Confirm Delete Action",
-                    "<p>You're about to remove the user " + row[0] + ":" + row[2] + " - Press ok to continue</p>",
-                    "Ok",
-                    removeUser);
+                                     "Confirm Delete Action",
+                                     "<p>You're about to remove the user " + row[0] + ":" + row[2] + " - Press ok to continue</p>",
+                                     "Ok",
+                                     removeUser);
     }
 
-    function renderCreateUserForm(cUsername=null, cRealm=null) {
+    function renderCreateUserForm(cUsername = false, cRealm = false) {
         var createUser = function createUser() {
             event.preventDefault();
-
+            console.log(cUsername + cRealm);
             var username = $('input[id=createUsername]').val();
             var password = $('input[id=createPassword]').val();
             var confirmPassword = $('input[id=createConfirmPassword]').val();
@@ -222,6 +230,7 @@ function ($,
                             "password": password,
                             "realm": realm};
 
+            console.log(password, confirmPassword);
             if(password != confirmPassword) {
                 return renderModal("password-mismatch",
                                     "Password Mismatch",
@@ -281,10 +290,13 @@ function ($,
             "Create User",
             html,
             "Create",
-            createUser);
-
-        if(cUsername && cRealm) {
+            createUser,
+            [cUsername, cRealm]);
+    
+        if(cUsername != "" || (cUsername != "" && cRealm != "")) {
             console.log("setting username and realm");
+            console.log(cUsername);
+            console.log(cRealm);
             $('input[id=createUsername]').val(cUsername);
             $('input[id=createRealm]').val(cRealm);
         }
