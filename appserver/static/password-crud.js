@@ -174,8 +174,10 @@ function ($,
 
     // Callback to refresh window and hide create-user
     function refreshWindow() {
-        location.reload()
-        $('#create-user').show();
+        setTimeout(function () {
+            location.reload()
+            $('#create-user').show();
+        }, 500);
     }
 
     function deleteCredential(row, tableDiv) {
