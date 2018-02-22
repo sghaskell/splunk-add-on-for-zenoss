@@ -18,6 +18,49 @@ function ($,
           SearchManager,
           Modal) {
 
+    function showPassword(row) {
+        console.log("hey now");
+        console.log(row);
+        renderModal("show-password",
+                    "Clear Password",
+                    "<p>" + row.clear_password + "</p>",
+                    "Close");
+    }
+
+    function renderModal(id, title, body, buttonText, callback=function(){}, callbackArgs=null) {
+        var myModal = new Modal(id, {
+                    title: title,
+                    destroyOnHide: true,
+                    type: 'wide'
+        }); 
+
+        var hold = function () {
+            if(reload == true) {
+                location.reload();
+            }
+            console.log("returning");
+            return true;
+        }
+
+        // $(myModal.$el).on("hide", function(){
+            // Not taking any action on hide, but you can if you want to!
+        // })
+    
+        myModal.body.append($(body));
+    
+        myModal.footer.append($('<button>').attr({
+            type: 'button',
+            'data-dismiss': 'modal'
+        }).addClass('btn btn-primary mlts-modal-submit').text(buttonText).on('click', function () { 
+                if(callbackArgs) {
+                    callback.apply(this, callbackArgs);
+                } else { 
+                    callback();
+                }
+            }))
+        myModal.show(); // Launch it!  
+    }
+
     /* Run Search */
     function runSearch() {
         var contextMenuDiv = '#context-menu';
@@ -64,57 +107,11 @@ function ($,
         });
     }
 
-    // Callback to refresh window and hide create-user
-    function refreshWindow() {
-        location.reload()
-        $('#create-user').show();
-    }
-
-    function deleteCredential(row, tableDiv) {
-        var username=Splunk.util.getConfigValue("USERNAME");      
-        var url = "/en-US/splunkd/__raw/servicesNS/" + username + "/" + row[3] + "/storage/passwords/" + row[2] + ":" + row[0] +":";
-
-
-        var removeUser = function () {
-            $.ajax({
-                type: "DELETE",
-                url: url,
-                success: function() {
-                    renderModal("user-deleted",
-                                "User Deleted",
-                                "<p>Successfully deleted user " + row[0] + ":" + row[2] + "</p>",
-                                "Close",
-                                refreshWindow) 
-                },
-                error: function() {
-                    alert("Failed to delete user " + row[0] + ". See console for details");
-                }
-            });
-        }
-
-        var deleteUser = renderModal("user-delete-confirm",
-                    "Confirm Delete Action",
-                    "<p>You're about to remove the user " + row[0] + ":" + row[2] + " - Press ok to continue</p>",
-                    "Ok",
-                    removeUser); 
-        console.log("deleting user" + deleteUser);
-    }
-
-    function showPassword(row) {
-        console.log("hey now");
-        console.log(row);
-        renderModal("show-password",
-                    "Clear Password",
-                    "<p>" + row.clear_password + "</p>",
-                    "Close");
-    }
-
     function createTable(tableDiv, contextMenuDiv, data) {
         var html = '<p> Click <b>Create</b> to add a user or right click on a row to create, update or delete.</p> \
                     <p><button id="main-create" class="btn btn-primary">Create</button></p>';
         var tdHtml = "";
         var contextMenu = '<ul id="example1-context-menu" class="dropdown-menu"> \
-                             <li data-item="create"><a>Create</a></li> \
                              <li data-item="update"><a>Update</a></li> \
                              <li data-item="delete"><a>Delete</a></li> \
                              <li data-item="show"><a>Show Password</a></li> \
@@ -151,9 +148,7 @@ function ($,
         $('#rest-password-table').bootstrapTable({
             contextMenu: '#example1-context-menu',
             onContextMenuItem: function(row, $el){
-                if($el.data("item") == "create") {
-                    renderCreateUserForm();
-                } else if($el.data("item") == "update"){
+                if($el.data("item") == "update"){
                     renderUpdateUserForm(row);
                 } else if($el.data("item") == "delete"){
                     deleteCredential(row, tableDiv);
@@ -164,47 +159,64 @@ function ($,
         });
     }
 
-    function renderModal(id, title, body, buttonText, callback=null, callbackArgs=null) {
-        var myModal = new Modal(id, {
-                 title: title,
-                 destroyOnHide: true,
-                 type: 'wide'
-        }); 
+    // Callback to refresh window and hide create-user
+    function refreshWindow() {
+        location.reload()
+        $('#create-user').show();
+    }
 
-        var hold = function () {
-            if(reload == true) {
-                location.reload();
-            }
-            console.log("returning");
-            return true;
+    function deleteCredential(row, tableDiv) {
+        var username=Splunk.util.getConfigValue("USERNAME");      
+        var url = "/en-US/splunkd/__raw/servicesNS/" + username + "/" + row.app + "/storage/passwords/" + row.realm + ":" + row.username +":";
+
+        var removeUser = function () {
+            $.ajax({
+                type: "DELETE",
+                url: url,
+                success: function() {
+                    renderModal("user-deleted",
+                                "User Deleted",
+                                "<p>Successfully deleted user " + row.username + ":" + row.realm + "</p>",
+                                "Close",
+                                refreshWindow) 
+                },
+                error: function() {
+                    alert("Failed to delete user " + row[0] + ". See console for details");
+                }
+            });
         }
 
-        // $(myModal.$el).on("hide", function(){
-            // Not taking any action on hide, but you can if you want to!
-        // })
- 
-        myModal.body.append($(body));
- 
-        myModal.footer.append($('<button>').attr({
-            type: 'button',
-            'data-dismiss': 'modal'
-        }).addClass('btn btn-primary mlts-modal-submit').text(buttonText).on('click', function () { 
-                if(callbackArgs) {
-                    callback.apply(this, callbackArgs);
-                } else { 
-                    callback();
-                }
-            }))
-        myModal.show(); // Launch it!  
-    }   
+        var deleteUser = renderModal("user-delete-confirm",
+                    "Confirm Delete Action",
+                    "<p>You're about to remove the user " + row[0] + ":" + row[2] + " - Press ok to continue</p>",
+                    "Ok",
+                    removeUser);
+    }
 
-    function renderCreateUserForm() {
+    function renderCreateUserForm(cUsername=null, cRealm=null) {
         var createUser = function createUser() {
             event.preventDefault();
+
             var username = $('input[id=createUsername]').val();
             var password = $('input[id=createPassword]').val();
             var confirmPassword = $('input[id=createConfirmPassword]').val();
             var realm = $('input[id=createRealm]').val();
+            
+            if(username == "") {
+                return renderModal("missing-username",
+                                    "Missing Username",
+                                    "<p>Please enter a username</b>",
+                                    "Close",
+                                    renderCreateUserForm);
+            }
+
+            if(password == "") {
+                return renderModal("missing-password",
+                                    "Missing Password",
+                                    "<p>Please enter a password</b>",
+                                    "Close",
+                                    renderCreateUserForm);
+            }
 
             var formData = {"name": username,
                             "password": password,
@@ -215,7 +227,8 @@ function ($,
                                     "Password Mismatch",
                                     "<p>Passwords do not match</b>",
                                     "Close",
-                                    renderCreateUserForm);
+                                    renderCreateUserForm,
+                                    [username, realm]);
             } else {
                 var currentUser = Splunk.util.getConfigValue("USERNAME");      
                 var app = utils.getCurrentApp();
@@ -237,8 +250,7 @@ function ($,
                         renderModal("user-add-fail",
                                     "Failed User Creation",
                                     "<p>Failed to create user " + username + ":" + realm + "</p><br><p>" + e.responseText + "</p>",
-                                    "Close",
-                                    function() {return});
+                                    "Close");
                     }
                 })
             }
@@ -270,6 +282,12 @@ function ($,
             html,
             "Create",
             createUser);
+
+        if(cUsername && cRealm) {
+            console.log("setting username and realm");
+            $('input[id=createUsername]').val(cUsername);
+            $('input[id=createRealm]').val(cRealm);
+        }
     }
 
     function renderUpdateUserForm(row) {
@@ -360,7 +378,6 @@ function ($,
         
     }
 
-    
     runSearch();
 
 });
