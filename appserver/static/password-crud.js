@@ -19,8 +19,6 @@ function ($,
           Modal) {
 
     function showPassword(row) {
-        console.log("hey now");
-        console.log(row);
         renderModal("show-password",
                     "Clear Password",
                     "<p>" + row.clear_password + "</p>",
@@ -118,7 +116,6 @@ function ($,
         var contextMenu = '<ul id="example1-context-menu" class="dropdown-menu"> \
                              <li data-item="update"><a>Update</a></li> \
                              <li data-item="delete"><a>Delete</a></li> \
-                             <li data-item="show"><a>Show Password</a></li> \
                            </ul>';
         var header = '<table id="rest-password-table" \
                              class="table table-striped table-hover" \
@@ -134,7 +131,7 @@ function ($,
                       <thead> \
                         <tr> \
                             <th data-field="username" data-sortable="true"><div><h3>Username</h3></div></th> \
-                            <th data-field="password"><div><h3>Password</h3></div></th> \
+                            <th data-field="password" data-events="operateEvents"><div><h3>Password</h3></div></th> \
                             <th data-field="realm" data-sortable="true"><div><h3><h3>Realm</h3></div></th> \
                             <th data-field="app" data-sortable="true"><div><h3>App</h3></div></th> \
                             <th data-field="clear_password" data-visible="false"><div><h3>Clear Password</h3></div></th> \
@@ -145,7 +142,11 @@ function ($,
         _.each(data, function(row, i) {
             tdHtml += '<tr class="striped"> \
                          <td>' + row.username + '</td> \
-                         <td>' + row.password + '</td> \
+                         <td> \
+                           <a class="show" href="javascript:void(0)" title="Show Password"> \
+                             <li class="icon-visible"></li> \
+                           </a> \
+                         </td> \
                          <td>' + row.realm + '</td> \
                          <td>' + row.app + '</td> \
                          <td>' + row.clear_password + '</td> \
@@ -166,8 +167,6 @@ function ($,
                     renderUpdateUserForm(row);
                 } else if($el.data("item") == "delete"){
                     deleteCredential(row, tableDiv);
-                } else if($el.data("item") == "show"){
-                    showPassword(row);
                 }
             }
         });
@@ -395,6 +394,12 @@ function ($,
                     updateUser);
         
     }
+
+    window.operateEvents = {
+        'click .show': function (e, value, row, index) {
+            showPassword(row);
+        }
+    };
 
     runSearch();
 
