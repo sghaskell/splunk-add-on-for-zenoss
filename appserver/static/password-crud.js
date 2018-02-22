@@ -299,13 +299,15 @@ function ($,
             createUser,
             [cUsername, cRealm]);
     
-        if(cUsername != "" || (cUsername != "" && cRealm != "")) {
-            console.log("setting username and realm");
-            console.log(cUsername);
-            console.log(cRealm);
-            $('input[id=createUsername]').val(cUsername);
-            $('input[id=createRealm]').val(cRealm);
-        }
+        setTimeout(function () {
+            if(cUsername != "" || (cUsername != "" && cRealm != "")) {
+                console.log("setting username and realm");
+                console.log(cUsername);
+                console.log(cRealm);
+                $('input[id=createUsername]').val(cUsername);
+                $('input[id=createRealm]').val(cRealm);
+            }
+        }, 300);
     }
 
     function renderUpdateUserForm(row) {
