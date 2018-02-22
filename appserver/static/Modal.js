@@ -44,7 +44,7 @@ define(['underscore'], function (_) {
 
             this.footer = $('<div>').addClass('modal-footer');
 
-            this.$el = $('<div>').addClass('modal mlts-modal').attr('id', modalId).append($('<div>').addClass('modal-dialog').append($('<div>').addClass('modal-content').append(header.append(headerCloseButton, this.title), this.body, this.footer)));
+            this.$el = $('<div>').addClass('modal hid fade mlts-modal').attr('id', modalId).append($('<div>').addClass('modal-dialog').append($('<div>').addClass('modal-content').append(header.append(headerCloseButton, this.title), this.body, this.footer)));
 
             if (modalOptions.title != null) this.setTitle(modalOptions.title);
 
