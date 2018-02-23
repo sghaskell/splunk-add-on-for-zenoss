@@ -1,0 +1,63 @@
+<form class="form-horizontal form-complex">
+<div class="control-group">
+	<label class="control-label" for="zenoss_event_web_address">Zenoss Web Interface <span class="required">*</span> </label>
+    <div class="controls">
+	<input type="text" name="action.zenoss_event.param.web_address" id="zenoss_event_web_address"/>
+                <span class="help-block"> 
+                    Zenoss web interface address; e.g. http://zenoss-server:8080 or https://zenoss5.mydomain.com
+                </span>
+    </div>
+</div>
+<div class="control-group">
+	<label class="control-label" for="zenoss_event_splunk_server_name">Splunk Server Name <span class="required">*</span> </label>
+    <div class="controls">
+	<input type="text" name="action.zenoss_event.param.splunk_server_name" id="zenoss_event_splunk_server_name"/>
+                <span class="help-block"> 
+                    Splunk server name or IP address
+                </span>
+    </div>
+</div>
+<div class="control-group">
+	<label class="control-label" for="zenoss_event_credential_account">Credential Account <span class="required">*</span> </label>
+    <div class="controls">
+	<input type="text" name="action.zenoss_event.param.credential_account" id="zenoss_event_credential_account"/>
+                <span class="help-block"> 
+                    Name of credentials to use for authorization. Specify username for valid credentials entered during app setup.
+                </span>
+    </div>
+</div>
+<div class="control-group">
+	<label class="control-label" for="zenoss_event_credential_app_context">Credential App Context  </label>
+    <div class="controls">
+	<input type="text" name="action.zenoss_event.param.credential_app_context" id="zenoss_event_credential_app_context"/>
+                <span class="help-block"> 
+                    Specify credential app context. Default: TA-zenoss
+                </span>
+    </div>
+</div>
+<div class="control-group">
+	<label class="control-label" for="zenoss_event_credential_realm">Credential Realm  </label>
+    <div class="controls">
+	<input type="text" name="action.zenoss_event.param.credential_realm" id="zenoss_event_credential_realm"/>
+    </div>
+</div>
+<div class="control-group">
+    <label class="control-label" for="zenoss_event_no_ssl_cert_check">SSL Verification</label>
+    <div class="controls">
+      <splunk-radio-input name="action.zenoss_event.param.no_ssl_cert_check" id="zenoss_event_no_ssl_cert_check" value="0"/>
+        <option value="1">Disabled</option>
+        <option value="0">Enabled</option>
+      </splunk-radio-input>
+      <span class="help-block"> Disable SSL verification. **WARNING** This is a potentially dangerous option.</span>
+    </div>
+</div>
+<div class="control-group">
+	<label class="control-label" for="zenoss_event_cafile">CA File  </label>
+    <div class="controls">
+	<input type="text" name="action.zenoss_event.param.cafile" id="zenoss_event_cafile"/>
+                <span class="help-block"> 
+                    Optional: Specify certificate authority file in PEM format for certificates signed by untrusted root authority
+                </span>
+    </div>
+</div>
+</form>
