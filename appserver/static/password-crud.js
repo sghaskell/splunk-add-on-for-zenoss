@@ -207,7 +207,7 @@ function ($,
 
         var deleteUser = renderModal("user-delete-confirm",
                                      "Confirm Delete Action",
-                                     "<p>You're about to remove the user " + row[0] + ":" + row[2] + " - Press ok to continue</p>",
+                                     "<p>You're about to remove the user " + row.username + ":" + row.realm + " - Press ok to continue</p>",
                                      "Ok",
                                      removeUser);
     }
