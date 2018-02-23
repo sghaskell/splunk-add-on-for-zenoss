@@ -6,7 +6,6 @@ import os
 import argparse
 import gzip
 import csv
-import logging
 from pprint import pprint
 from zenoss_server_config import ZenossServerConfig
 from zenoss_api import ZenossAPI
@@ -76,20 +75,27 @@ def process_event(helper, *args, **kwargs):
     session_key = helper.session_key
     splunk_server_name = helper.get_param("splunk_server_name")
 
-    res = helper.send_http_request("https://%s:8089/servicesNS/admin/%s/storage/passwords/%s:%s" % (splunk_server_name, credential_app_context, credential_realm, credential_account), "GET", headers={'Authorization': 'Splunk %s' % session_key}, verify=False)
-    
-    user_xml = untangle.parse(res.content)
-    for o in user_xml.feed.entry.content.s_dict.s_key:
-        if(o['name'] == 'clear_password'):
-            helper.log_info("clear_password={}".format(o.cdata))
-            password = o.cdata
-    #try:
-    z = ZenossAPI(web_address, credential_account, password, bool(int(no_ssl_cert_check)), cafile)
-    #except Exception, e:
-    #    helper.log_error("Zenoss Create Event: Failed to connect to zenoss server - %s" % e)
+    try:
+        # Get password from REST API
+        res = helper.send_http_request("https://%s:8089/servicesNS/admin/%s/storage/passwords/%s:%s" % (splunk_server_name, credential_app_context, credential_realm, credential_account), "GET", headers={'Authorization': 'Splunk %s' % session_key}, verify=False)
+
+        # Parse clear password
+        user_xml = untangle.parse(res.content)
+        for o in user_xml.feed.entry.content.s_dict.s_key:
+            if(o['name'] == 'clear_password'):
+                password = o.cdata
+    except Exception, e:
+        helper.log_error("Failed to get password for user %s, realm %s. Scheduled user must have Admin privileges. - %s" % (credential_account, credential_realm, e))
+        sys.exit(1)
+
+    try:
+        z = ZenossAPI(web_address, credential_account, password, bool(int(no_ssl_cert_check)), cafile)
+    except Exception, e:
+        helper.log_error("Failed to connect to zenoss server - %s" % e)
+        sys.exit(1)
 
     events = helper.get_events()
-    helper.log_info("events={}".format(events))
+
     for r in events:
         helper.log_info("event={}".format(r))
     
@@ -98,7 +104,7 @@ def process_event(helper, *args, **kwargs):
         elif r.has_key('host'):
             device = r.get('host')
         else:
-            logging.error("Zenoss Create Event: No host or device specified")
+            helper.log_error("No host or device specified")
             sys.exit(1)
 
         if r.has_key('component'):
@@ -116,13 +122,11 @@ def process_event(helper, *args, **kwargs):
         else:
             evclasskey = ''
         helper.log_info("%s %s %s" % (device, evclass, component))
-        #try:
-        z.create_event_on_device(device, r.get('severity'), r.get('summary'), component=component, evclass=evclass, evclasskey=evclasskey)
-        #except Exception, e:
-        #    helper.log_error("Zenoss Create Event: Failed to create event - %s" % e)
-        #    sys.exit(1)        
+        try:
+            z.create_event_on_device(device, r.get('severity'), r.get('summary'), component=component, evclass=evclass, evclasskey=evclasskey)
+        except Exception, e:
+            helper.log_error("Zenoss Create Event: Failed to create event - %s" % e)
+            sys.exit(1)        
     
-    #helper.log_info("creds={}".format(dir(untangle)))
-    #helper.log_info("utangle={}".format(user_xml))
     # TODO: Implement your alert action logic here
     return 0
