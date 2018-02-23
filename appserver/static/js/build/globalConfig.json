@@ -1,0 +1,94 @@
+{
+    "pages": {
+        "configuration": {
+            "tabs": [
+                {
+                    "table": {
+                        "header": [
+                            {
+                                "field": "name", 
+                                "label": "Account name"
+                            }, 
+                            {
+                                "field": "username", 
+                                "label": "Username"
+                            }
+                        ], 
+                        "actions": [
+                            "edit", 
+                            "delete", 
+                            "clone"
+                        ]
+                    }, 
+                    "entity": [
+                        {
+                            "required": true, 
+                            "help": "Enter a unique name for this account.", 
+                            "field": "name", 
+                            "type": "text", 
+                            "label": "Account name", 
+                            "validators": [
+                                {
+                                    "maxLength": 50, 
+                                    "type": "string", 
+                                    "errorMsg": "Length of Account name should be between 1 and 50", 
+                                    "minLength": 1
+                                }, 
+                                {
+                                    "type": "regex", 
+                                    "errorMsg": "Account name must start with a letter and followed by alphabetic letters, digits or underscores.", 
+                                    "pattern": "^[a-zA-Z]\\w*$"
+                                }
+                            ]
+                        }, 
+                        {
+                            "field": "username", 
+                            "help": "Enter the username for this account.", 
+                            "options": {
+                                "placeholder": "Enter the username here"
+                            }, 
+                            "type": "text", 
+                            "label": "Username", 
+                            "required": true, 
+                            "validators": [
+                                {
+                                    "maxLength": 200, 
+                                    "type": "string", 
+                                    "errorMsg": "Length of username should be between 1 and 200", 
+                                    "minLength": 1
+                                }
+                            ]
+                        }, 
+                        {
+                            "field": "password", 
+                            "help": "Enter the password for this account.", 
+                            "encrypted": true, 
+                            "type": "text", 
+                            "label": "Password", 
+                            "required": true, 
+                            "validators": [
+                                {
+                                    "maxLength": 8192, 
+                                    "type": "string", 
+                                    "errorMsg": "Length of password should be between 1 and 8192", 
+                                    "minLength": 1
+                                }
+                            ]
+                        }
+                    ], 
+                    "name": "account", 
+                    "title": "Account"
+                }
+            ], 
+            "title": "Configuration", 
+            "description": "Set up your add-on"
+        }
+    }, 
+    "meta": {
+        "version": "1.0.5", 
+        "displayName": "Splunk for Zenoss", 
+        "apiVersion": "3.0.0", 
+        "name": "TA-zenoss", 
+        "restRoot": "TA_zenoss"
+    }
+}
