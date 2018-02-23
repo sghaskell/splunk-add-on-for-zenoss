@@ -6,8 +6,9 @@ require(['jquery',
         'splunkjs/mvc/utils',
         'splunkjs/mvc/tokenutils',
         'splunkjs/mvc/messages',
-        'splunkjs/mvc/searchmanager',
+        'splunkjs/mvc/searchmanager',        
         '/static/app/TA-zenoss/Modal.js',
+        'splunkjs/mvc/simpleform/input/dropdown',
         'splunkjs/mvc/simplexml/ready!'],
 function ($,
           _,
@@ -16,7 +17,8 @@ function ($,
           TokenUtils,
           Messages,
           SearchManager,
-          Modal) {
+          Modal,
+          Dropdown) {
 
     function showPassword(row) {
         renderModal("show-password",
@@ -122,9 +124,11 @@ function ($,
                              data-toolbar="#toolbar" \
                              data-sort-name="username" \
                              data-show-pagination-switch="true" \
+                             data-id-field="id" \
                              data-pagination="true" \
                              data-sortable="true" \
                              data-page-size="10" \
+                             data-page-list="[10, 25, 50, 100, ALL]" \
                              data-smart-display="true" \
                              data-search="true" \
                              data-show-footer="false"> \
