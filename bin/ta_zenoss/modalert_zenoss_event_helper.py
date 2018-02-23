@@ -85,7 +85,7 @@ def process_event(helper, *args, **kwargs):
             if(o['name'] == 'clear_password'):
                 password = o.cdata
     except Exception, e:
-        helper.log_error("Failed to get password for user %s, realm %s. Scheduled user must have Admin privileges. - %s" % (credential_account, credential_realm, e))
+        helper.log_error("Failed to get password for user %s, realm %s. Verify credential account exists. User who scheduled alert must have Admin privileges. - %s" % (credential_account, credential_realm, e))
         sys.exit(1)
 
     try:
