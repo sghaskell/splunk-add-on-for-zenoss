@@ -31,7 +31,7 @@ class ZenossAPI():
         self.ZENOSS_USERNAME = username
         self.ZENOSS_PASSWORD = password
         self.isSslConnection = re.match(r'https',self.ZENOSS_INSTANCE)
-        self.isZenossCloud = re.findall(r'cz0', self.ZENOSS_INSTANCE)
+        self.isZenossCloud = re.match(r'^.*\/(cz)\d+.*', self.ZENOSS_INSTANCE)
         self.reqCount = 1
 
         # Added to support SSL connections for Zenoss 5.x
