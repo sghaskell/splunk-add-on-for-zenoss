@@ -27,7 +27,7 @@ ROUTERS = { 'MessagingRouter': 'messaging',
 
 class ZenossAPI():
     def __init__(self, server, username, password, no_ssl_cert_check=False, cafile=None, debug=False):
-        self.ZENOSS_INSTANCE = server
+        self.ZENOSS_INSTANCE = server.rstrip("/")
         self.ZENOSS_USERNAME = username
         self.ZENOSS_PASSWORD = password
         self.isSslConnection = re.match(r'https',self.ZENOSS_INSTANCE)
