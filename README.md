@@ -12,9 +12,9 @@ This has been tested against and is known to be compatible with Zenoss 4.x and 5
 
 **Username**: zenoss username  
 **password**: zenoss password  
-**Zenoss Web Interface**: Web interface to Zenoss server; e.g.http://zenoss-server:8080 or https://zenoss5.myhost.mydomain for Zenoss 5.x connections.
+**Zenoss Web Interface**: Web interface to Zenoss server; e.g.http://zenoss-server:8080, https://zenoss5.myhost.mydomain for Zenoss 5.x connections or https://myinstance.zenoss.io/cz0 for Zenoss Cloud.
 **Device Name (Optional)**: Filter to only pull from a specific device. Defaults to all devices
-**Disable SSL Certificate Verification**: Zenoss 5.x installs - check to disable SSL verification. **WARNING** This is a potentially dangerous option.
+**Disable SSL Certificate Verification**: Zenoss 5.x installs - check to disable SSL verification. *WARNING* This is a potentially dangerous option.
 **CA File**: Optional: Zenoss 5.x installs - specify certificate authority file in PEM format for certificates signed by untrusted root authority
 **Timezone (Optional)**: Timezone of Zenoss server - see [http://en.wikipedia.org/wiki/List_of_tz_database_time_zones](http://en.wikipedia.org/wiki/List_of_tz_database_time_zones)  
 **Archive Threshold**: Zenoss 'Event Archive Threshold (minutes)' setting. Interval to read archive table. Leave blank for Zenoss default of 4320.  
