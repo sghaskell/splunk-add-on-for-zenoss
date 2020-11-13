@@ -27,10 +27,12 @@ ROUTERS = { 'MessagingRouter': 'messaging',
 
 class ZenossAPI():
     def __init__(self, server, username, password, no_ssl_cert_check=False, cafile=None, debug=False):
-        self.ZENOSS_INSTANCE = server
+        self.ZENOSS_INSTANCE = server.rstrip("/")
         self.ZENOSS_USERNAME = username
         self.ZENOSS_PASSWORD = password
         self.isSslConnection = re.match(r'https',self.ZENOSS_INSTANCE)
+        self.isZenossCloud = re.match(r'^.*\/(cz)\d+.*', self.ZENOSS_INSTANCE)
+        self.reqCount = 1
 
         # Added to support SSL connections for Zenoss 5.x
         if(self.isSslConnection):
@@ -43,22 +45,22 @@ class ZenossAPI():
         else:
             self.urlOpener = urllib2.build_opener(urllib2.HTTPCookieProcessor())
 
-        
-        """
-        Initialize the API connection, log in, and store authentication cookie
-        """
-        # Use the HTTPCookieProcessor as urllib2 does not save cookies by default
-        #if debug: self.urlOpener.add_handler(urllib2.HTTPHandler(debuglevel=1))
-        self.reqCount = 1
-
-        # Contruct POST params and submit login.
-        loginParams = urllib.urlencode(dict(
-                __ac_name = self.ZENOSS_USERNAME,
-                __ac_password = self.ZENOSS_PASSWORD,
-                submitted = 'true',
-                came_from = self.ZENOSS_INSTANCE + '/zport/dmd'))
-        self.urlOpener.open(self.ZENOSS_INSTANCE + '/zport/acl_users/cookieAuthHelper/login',
-                    loginParams)
+        # Skip simple auth if Zenoss Cloud URI detected
+        if(not self.isZenossCloud):
+            """
+            Initialize the API connection, log in, and store authentication cookie
+            """
+            # Use the HTTPCookieProcessor as urllib2 does not save cookies by default
+            #if debug: self.urlOpener.add_handler(urllib2.HTTPHandler(debuglevel=1))
+            
+            # Contruct POST params and submit login.
+            loginParams = urllib.urlencode(dict(
+                    __ac_name = self.ZENOSS_USERNAME,
+                    __ac_password = self.ZENOSS_PASSWORD,
+                    submitted = 'true',
+                    came_from = self.ZENOSS_INSTANCE + '/zport/dmd'))
+            self.urlOpener.open(self.ZENOSS_INSTANCE + '/zport/acl_users/cookieAuthHelper/login',
+                        loginParams)
 
     def _router_request(self, router, method, data=[]):
         if router not in ROUTERS:
@@ -69,7 +71,11 @@ class ZenossAPI():
                       ROUTERS[router] + '_router')
 
         # NOTE: Content-type MUST be set to 'application/json' for these requests
-        req.add_header('Content-type', 'application/json; charset=utf-8')
+        req.add_header('Content-Type', 'application/json')
+
+        # Set z-api-key for Zenoss Cloud
+        if(self.isZenossCloud):
+            req.add_header('z-api-key', self.ZENOSS_PASSWORD)
 
         # Convert the request parameters into JSON
         reqData = json.dumps([dict(
