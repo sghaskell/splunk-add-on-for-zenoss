@@ -5,16 +5,16 @@ The 2.0 release brings the Zenoss Event custom alert action and the credential m
 You must be in the **admin role** or have the **admin_all_objects** capability enabled to use the Credential Management dashboard and schedule the Zenoss Event custom alert action.
 
 # Zenoss Compatibility
-This has been tested against and is known to be compatible with Zenoss 4.x and 5.x.
+This has been tested against and is known to be compatible with Zenoss 4.x and 5.x and Zenoss Cloud with token based authentication.
 
 # Configure Modular Input
 **Settings -> Data inputs -> Zenoss**
 
 **Username**: zenoss username  
 **password**: zenoss password  
-**Zenoss Web Interface**: Web interface to Zenoss server; e.g.http://zenoss-server:8080 or https://zenoss5.myhost.mydomain for Zenoss 5.x connections.
+**Zenoss Web Interface**: Web interface to Zenoss server; e.g.http://zenoss-server:8080, https://zenoss5.myhost.mydomain for Zenoss 5.x connections or https://myinstance.zenoss.io/cz0 for Zenoss Cloud.
 **Device Name (Optional)**: Filter to only pull from a specific device. Defaults to all devices
-**Disable SSL Certificate Verification**: Zenoss 5.x installs - check to disable SSL verification. **WARNING** This is a potentially dangerous option.
+**Disable SSL Certificate Verification**: Zenoss 5.x installs - check to disable SSL verification. *WARNING* This is a potentially dangerous option.
 **CA File**: Optional: Zenoss 5.x installs - specify certificate authority file in PEM format for certificates signed by untrusted root authority
 **Timezone (Optional)**: Timezone of Zenoss server - see [http://en.wikipedia.org/wiki/List_of_tz_database_time_zones](http://en.wikipedia.org/wiki/List_of_tz_database_time_zones)  
 **Archive Threshold**: Zenoss 'Event Archive Threshold (minutes)' setting. Interval to read archive table. Leave blank for Zenoss default of 4320.  
@@ -27,13 +27,15 @@ This has been tested against and is known to be compatible with Zenoss 4.x and 5
 **Index Repeat Events (Optional)**: Index repeat events. Index an event every time the count increments for an evid. This will result in the same event getting indexed with a new latestTime timestamp. This is useful for fine grained analytics on events. This setting could lead to an increase in indexing volume depending on your environment.            
 **Sourcetype**: Set to Manual and leave blank to set to 'zenoss-events'  
             
-##More Settings
+## More Settings
 **Interval**: Defaults to 60 seconds  
 **Host**: specify zenoss hostname  
 **Index**: specify zenoss index  
 
 # Credential Management
-Use the **Credential Management** dashboard to securely store credentials for your Zenoss server instances. The dashboard is a CRUD interface to the storage/passwords REST endpoint. You can **create, update, delete and reveal the password** for any credentials stored. Right click on any row to reveal a context menu for the **update** and **delete** actions. You can also leverage the realm field to describe a connection; e.g. - prod or dev.
+Use the **Credential Management** dashboard to securely store credentials, including Zenoss Cloud tokens, for your Zenoss server instances. The dashboard is a CRUD interface to the storage/passwords REST endpoint. You can **create, update, delete and reveal the password** for any credentials stored. Right click on any row to reveal a context menu for the **update** and **delete** actions. You can also leverage the realm field to describe a connection; e.g. - prod or dev.
+
+For full control over passwords, including RBAC, use the [REST storage/passwords Manager for Splunk](https://splunkbase.splunk.com/app/4013/).
 
 # Configuring Zenoss Event Custom Alert Action
 
