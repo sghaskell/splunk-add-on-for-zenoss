@@ -5,7 +5,7 @@ The 2.0 release brings the Zenoss Event custom alert action and the credential m
 You must be in the **admin role** or have the **admin_all_objects** capability enabled to use the Credential Management dashboard and schedule the Zenoss Event custom alert action.
 
 # Zenoss Compatibility
-This has been tested against and is known to be compatible with Zenoss 4.x and 5.x.
+This has been tested against and is known to be compatible with Zenoss 4.x and 5.x and Zenoss Cloud with token based authentication.
 
 # Configure Modular Input
 **Settings -> Data inputs -> Zenoss**
@@ -27,13 +27,13 @@ This has been tested against and is known to be compatible with Zenoss 4.x and 5
 **Index Repeat Events (Optional)**: Index repeat events. Index an event every time the count increments for an evid. This will result in the same event getting indexed with a new latestTime timestamp. This is useful for fine grained analytics on events. This setting could lead to an increase in indexing volume depending on your environment.            
 **Sourcetype**: Set to Manual and leave blank to set to 'zenoss-events'  
             
-##More Settings
+## More Settings
 **Interval**: Defaults to 60 seconds  
 **Host**: specify zenoss hostname  
 **Index**: specify zenoss index  
 
 # Credential Management
-Use the **Credential Management** dashboard to securely store credentials for your Zenoss server instances. The dashboard is a CRUD interface to the storage/passwords REST endpoint. You can **create, update, delete and reveal the password** for any credentials stored. Right click on any row to reveal a context menu for the **update** and **delete** actions. You can also leverage the realm field to describe a connection; e.g. - prod or dev.
+Use the **Credential Management** dashboard to securely store credentials, including Zenoss Cloud tokens, for your Zenoss server instances. The dashboard is a CRUD interface to the storage/passwords REST endpoint. You can **create, update, delete and reveal the password** for any credentials stored. Right click on any row to reveal a context menu for the **update** and **delete** actions. You can also leverage the realm field to describe a connection; e.g. - prod or dev.
 
 # Configuring Zenoss Event Custom Alert Action
 
