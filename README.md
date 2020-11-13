@@ -35,6 +35,8 @@ This has been tested against and is known to be compatible with Zenoss 4.x and 5
 # Credential Management
 Use the **Credential Management** dashboard to securely store credentials, including Zenoss Cloud tokens, for your Zenoss server instances. The dashboard is a CRUD interface to the storage/passwords REST endpoint. You can **create, update, delete and reveal the password** for any credentials stored. Right click on any row to reveal a context menu for the **update** and **delete** actions. You can also leverage the realm field to describe a connection; e.g. - prod or dev.
 
+For full control over passwords, including RBAC, use the [REST storage/passwords Manager for Splunk](https://splunkbase.splunk.com/app/4013/).
+
 # Configuring Zenoss Event Custom Alert Action
 
 **1)** Create credentials for your Zenoss instance using the Credential Management dashboard. Credentials will be securely stored in the storage/passwords REST endpoint and accessed by the Zenoss Event custom alert action. Please re-read the **Requirements** section before moving on.
