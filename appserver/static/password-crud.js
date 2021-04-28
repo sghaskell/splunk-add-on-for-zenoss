@@ -1,5 +1,9 @@
 'use strict';
-
+require.config({
+    paths: {
+        modal: '../app/' + splunkjs.mvc.Components.getInstance("env").toJSON().app + '/Modal',
+    }
+});
 require(['jquery',
         'underscore',
         'splunkjs/mvc',
@@ -7,7 +11,7 @@ require(['jquery',
         'splunkjs/mvc/tokenutils',
         'splunkjs/mvc/messages',
         'splunkjs/mvc/searchmanager',        
-        '/static/app/TA-zenoss/Modal.js',
+        "modal",
         'splunkjs/mvc/simpleform/input/dropdown',
         'splunkjs/mvc/simplexml/ready!'],
 function ($,
