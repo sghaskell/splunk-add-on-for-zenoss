@@ -1,18 +1,19 @@
+import ta_zenoss_declare
+
 import sys
 import os
-from splunklib.modularinput import *
+import os.path as op
+from splunklib import modularinput as smi
 from zenoss_api import ZenossAPI
-from pprint import pprint
 import xml.dom.minidom, xml.sax.saxutils
 import re
 import time
 import json
-import cPickle as pickle
+import pickle
 import gzip
 import pytz
 from datetime import datetime
 from tzlocal import get_localzone
-import time
 import calendar
 
 # Date format for Zenoss API
@@ -28,7 +29,7 @@ LIMIT = 1000
 DAY = 86400
 HOUR = 60
 
-# Checkpoint file class
+# Checkpoint file class TODO is this going to work for vetting?
 # params:
 #  checkpoint_dir - directory where modinput writes checkpoint files
 #  name - name of input to checkpoint
@@ -41,7 +42,7 @@ class Checkpointer:
     @property
     # Method to load checkpoint file
     def load(self):
-        f = self._open_checkpoint_file("rb")
+        f = self._open_checkpoint_file('rb')
         if f is None:
             return
 
@@ -49,9 +50,9 @@ class Checkpointer:
             checkpoint_pickle = pickle.load(f)
             f.close()
             return checkpoint_pickle
-        except Exception, e:
+        except Exception as e:
             log_message = "Error reading checkpoint pickle file '%s': %s" % (self.checkpoint_file_name, e)
-            self.ew.write("ERROR", log_message)
+            self.ew.log("ERROR", log_message)
             return {}
 
     # Method to open checkpoint file
@@ -62,7 +63,7 @@ class Checkpointer:
         try:
             f = gzip.open(self.checkpoint_file_name, mode)
             return f
-        except Exception, e:
+        except Exception as e:
             log_message = "Error opening '%s': %s" % (self.checkpoint_file_name, e)
             self.ew.log("ERROR", log_message)
             return None
@@ -72,12 +73,12 @@ class Checkpointer:
         tmp_file = "%s.tmp" % self.checkpoint_file_name
 
         try:
-            f = gzip.open(tmp_file, "wb")
+            f = gzip.open(tmp_file, 'wb')
             pickle.dump(events_dict, f)
             f.close()
             os.remove(self.checkpoint_file_name)
             os.rename(tmp_file, self.checkpoint_file_name)
-        except Exception, e:
+        except Exception as e:
             log_message = "Zenoss Events: Failed to update checkpoint file: %s" % e
             self.ew.log("ERROR", log_message)
 
@@ -93,7 +94,7 @@ class Checkpointer:
                     del events_dict[k]
 
 # Inherit Script class from splunklib
-class ZenossModInput(Script):
+class ZenossModInput(smi.Script):
 
     # Get events from JSON api and process
     # Zenoss JSON API only sends 1000 events no matter how
@@ -157,7 +158,7 @@ class ZenossModInput(Script):
     def write_event(self, e, ew):
         #sys.stdout.write("%s\n" % json.dumps(e))
         #sys.stdout.flush()
-        event = Event(data = json.dumps(e))
+        event = smi.Event(data = json.dumps(e))
         ew.write_event(event)
 
     # Process Zenoss events
@@ -233,97 +234,97 @@ lastTime %s -- skipping" % (evid, last_time)
     # params:
     #  none
     def get_scheme(self):
-        scheme = Scheme("Zenoss Events")
+        scheme = smi.Scheme("Zenoss Events")
         scheme.description = "Modular input to pull events from Zenoss API"
         scheme.use_external_validation = True
         scheme.use_single_instance = False
 
-        username = Argument("username")
-        username.data_type = Argument.data_type_string
+        username = smi.Argument("username")
+        username.data_type = smi.Argument.data_type_string
         username.required_on_edit = True
         username.required_on_create = True
         scheme.add_argument(username)
 
-        password = Argument("password") 
-        password.data_type = Argument.data_type_string
+        password = smi.Argument("password") 
+        password.data_type = smi.Argument.data_type_string
         password.required_on_edit = True
         password.required_on_create = True
         scheme.add_argument(password)
 
-        zenoss_server = Argument("zenoss_server")
-        zenoss_server.data_type = Argument.data_type_string
+        zenoss_server = smi.Argument("zenoss_server")
+        zenoss_server.data_type = smi.Argument.data_type_string
         zenoss_server.required_on_edit = True
         zenoss_server.required_on_create = True
         scheme.add_argument(zenoss_server)
 
-        no_ssl_cert_check = Argument("no_ssl_cert_check")
-        no_ssl_cert_check.data_type = Argument.data_type_boolean
+        no_ssl_cert_check = smi.Argument("no_ssl_cert_check")
+        no_ssl_cert_check.data_type = smi.Argument.data_type_boolean
         no_ssl_cert_check.required_on_edit = True
         no_ssl_cert_check.required_on_create = True
         scheme.add_argument(no_ssl_cert_check)
 
-        cafile = Argument("cafile")
-        cafile.data_type = Argument.data_type_string
+        cafile = smi.Argument("cafile")
+        cafile.data_type = smi.Argument.data_type_string
         cafile.required_on_edit = False
         cafile.required_on_create = False
         scheme.add_argument(cafile)
 
-        device = Argument("device")
-        device.data_type = Argument.data_type_string
+        device = smi.Argument("device")
+        device.data_type = smi.Argument.data_type_string
         device.required_on_edit = False
         device.required_on_create = False
         scheme.add_argument(device)
 
-        tzone = Argument("tzone")
-        tzone.data_type = Argument.data_type_string
+        tzone = smi.Argument("tzone")
+        tzone.data_type = smi.Argument.data_type_string
         tzone.required_on_edit = False
         tzone.required_on_create = False
         scheme.add_argument(tzone)
 
-        start_date = Argument("start_date")
-        start_date.data_type = Argument.data_type_string
+        start_date = smi.Argument("start_date")
+        start_date.data_type = smi.Argument.data_type_string
         start_date.required_on_edit = False
         start_date.required_on_create = False
         scheme.add_argument(start_date)
 
-        index_closed = Argument("index_closed")
-        index_closed.data_type = Argument.data_type_boolean
+        index_closed = smi.Argument("index_closed")
+        index_closed.data_type = smi.Argument.data_type_boolean
         index_closed.required_on_edit = False
         index_closed.required_on_create = False
         scheme.add_argument(index_closed)
 
-        index_cleared = Argument("index_cleared")
-        index_cleared.data_type = Argument.data_type_boolean
+        index_cleared = smi.Argument("index_cleared")
+        index_cleared.data_type = smi.Argument.data_type_boolean
         index_cleared.required_on_edit = False
         index_cleared.required_on_create = False
         scheme.add_argument(index_cleared)
 
-        index_archived = Argument("index_archived")
-        index_archived.data_type = Argument.data_type_boolean
+        index_archived = smi.Argument("index_archived")
+        index_archived.data_type = smi.Argument.data_type_boolean
         index_archived.required_on_edit = False
         index_archived.required_on_create = False
         scheme.add_argument(index_archived)
 
-        index_suppressed = Argument("index_suppressed")
-        index_suppressed.data_type = Argument.data_type_boolean
+        index_suppressed = smi.Argument("index_suppressed")
+        index_suppressed.data_type = smi.Argument.data_type_boolean
         index_suppressed.required_on_edit = False
         index_suppressed.required_on_create = False
         scheme.add_argument(index_suppressed)
 
-        index_repeats = Argument("index_repeats")
-        index_repeats.data_type = Argument.data_type_boolean
+        index_repeats = smi.Argument("index_repeats")
+        index_repeats.data_type = smi.Argument.data_type_boolean
         index_repeats.required_on_edit = False
         index_repeats.required_on_create = False
         scheme.add_argument(index_repeats)
 
-        archive_threshold = Argument("archive_threshold")
-        archive_threshold.data_type = Argument.data_type_string
+        archive_threshold = smi.Argument("archive_threshold")
+        archive_threshold.data_type = smi.Argument.data_type_string
         archive_threshold.required_on_edit = False
         archive_threshold.required_on_create = False
         scheme.add_argument(archive_threshold)
 
-        checkpoint_delete_threshold = Argument("checkpoint_delete_threshold")
-        checkpoint_delete_threshold.data_type = Argument.data_type_string
+        checkpoint_delete_threshold = smi.Argument("checkpoint_delete_threshold")
+        checkpoint_delete_threshold.data_type = smi.Argument.data_type_string
         checkpoint_delete_threshold.required_on_edit = False
         checkpoint_delete_threshold.required_on_create = False
         scheme.add_argument(checkpoint_delete_threshold)
@@ -373,7 +374,7 @@ interface address are correct" % zenoss_server)
         instance = inputs.inputs.keys().pop()
         config = inputs.inputs[instance]
         input_name = re.sub("^.*?\/\/","", instance) 
-                
+
         # Create UTC timezone for conversion
         utc = pytz.utc
         params = {}
@@ -427,7 +428,7 @@ interface address are correct" % zenoss_server)
             try:
                 gzip.open(chk.checkpoint_file_name, 'wb').close()
                 chk.update(events_dict)
-            except Exception, e:
+            except Exception as e:
                 log_message = "Zenoss Events: Failed to create checkpoint file %s - Error: %s" % (chk.checkpoint_file_name, e)
                 ew.log("ERROR", log_message)
         try:
@@ -452,7 +453,7 @@ interface address are correct" % zenoss_server)
             # Connect to Zenoss web interface and get events
             try:
                 z = ZenossAPI(zenoss_server, username, password, no_ssl_cert_check, cafile)
-            except Exception, e:
+            except Exception as e:
                 log_message = "Zenoss Events: Failed to connect to server %s as user %s - Error: %s" % (zenoss_server,
                                                                                                         username,
                                                                                                         e)
@@ -523,4 +524,5 @@ interface address are correct" % zenoss_server)
             time.sleep(float(interval)) 
 
 if __name__ == '__main__':
-    sys.exit(ZenossModInput().run(sys.argv))    
+    exit_code = ZenossModInput().run(sys.argv)
+    sys.exit(exit_code)

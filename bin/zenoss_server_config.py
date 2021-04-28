@@ -75,6 +75,7 @@ class ZenossServerConfig:
             sys.stderr.write("Config file does not exist: %s\n" % self.config_path)
             sys.exit(1)
 
+        # FIXME this lib is compatible w/ py2 only
         c = ConfigParser()
         config = c.add_file(self.config_path)
         try:

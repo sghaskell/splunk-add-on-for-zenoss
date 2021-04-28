@@ -9,9 +9,13 @@
 
 import json
 import urllib
-import urllib2
+import requests
 import ssl
 import re
+
+from requests.packages.urllib3.exceptions import InsecureRequestWarning
+
+requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 ROUTERS = { 'MessagingRouter': 'messaging',
         'EventsRouter': 'evconsole',
@@ -30,20 +34,22 @@ class ZenossAPI():
         self.ZENOSS_INSTANCE = server.rstrip("/")
         self.ZENOSS_USERNAME = username
         self.ZENOSS_PASSWORD = password
-        self.isSslConnection = re.match(r'https',self.ZENOSS_INSTANCE)
+        # self.isSslConnection = re.match(r'https',self.ZENOSS_INSTANCE)
         self.isZenossCloud = re.match(r'^.*\/(cz)\d+.*', self.ZENOSS_INSTANCE)
-        self.reqCount = 1
+        # self.reqCount = 1
+        self.tid = 1
 
         # Added to support SSL connections for Zenoss 5.x
-        if(self.isSslConnection):
-            self.ctx = ssl.create_default_context(cafile=cafile)
-            if no_ssl_cert_check:
-                self.ctx.check_hostname = False
-                self.ctx.verify_mode = ssl.CERT_NONE
-            self.ssl_handler = urllib2.HTTPSHandler(context=self.ctx)
-            self.urlOpener = urllib2.build_opener(self.ssl_handler, urllib2.HTTPCookieProcessor())
-        else:
-            self.urlOpener = urllib2.build_opener(urllib2.HTTPCookieProcessor())
+        # if(self.isSslConnection):
+        #     self.ctx = ssl.create_default_context(cafile=cafile)
+        #     if no_ssl_cert_check:
+        #         self.ctx.check_hostname = False
+        #         self.ctx.verify_mode = ssl.CERT_NONE
+        #     self.ssl_handler = urllib2.HTTPSHandler(context=self.ctx)
+        #     self.urlOpener = urllib2.build_opener(self.ssl_handler, urllib2.HTTPCookieProcessor())
+        # else:
+        #     self.urlOpener = urllib2.build_opener(urllib2.HTTPCookieProcessor())
+        self.session = requests.Session(cert=cafile, verify=no_ssl_cert_check)
 
         # Skip simple auth if Zenoss Cloud URI detected
         if(not self.isZenossCloud):
@@ -54,43 +60,69 @@ class ZenossAPI():
             #if debug: self.urlOpener.add_handler(urllib2.HTTPHandler(debuglevel=1))
             
             # Contruct POST params and submit login.
-            loginParams = urllib.urlencode(dict(
-                    __ac_name = self.ZENOSS_USERNAME,
-                    __ac_password = self.ZENOSS_PASSWORD,
-                    submitted = 'true',
-                    came_from = self.ZENOSS_INSTANCE + '/zport/dmd'))
-            self.urlOpener.open(self.ZENOSS_INSTANCE + '/zport/acl_users/cookieAuthHelper/login',
-                        loginParams)
+            # loginParams = urllib.urlencode(dict(
+            #         __ac_name = self.ZENOSS_USERNAME,
+            #         __ac_password = self.ZENOSS_PASSWORD,
+            #         submitted = 'true',
+            #         came_from = self.ZENOSS_INSTANCE + '/zport/dmd'))
+            # self.urlOpener.open(self.ZENOSS_INSTANCE + '/zport/acl_users/cookieAuthHelper/login',
+            #             loginParams)
+            data = {
+                "__ac_name": self.ZENOSS_USERNAME,
+                "__ac_password": self.ZENOSS_PASSWORD,
+                "submitted": True,
+                "came_from": "{}/zport/dmd".format(self.ZENOSS_INSTANCE)
+            }
+            
+            url = "{}/zport/acl_users/cookieAuthHelper/login".format(self.ZENOSS_INSTANCE)
+            
+            self.session.post(url, data=data)
 
     def _router_request(self, router, method, data=[]):
         if router not in ROUTERS:
-            raise Exception('Router "' + router + '" not available.')
+            raise Exception("Router '{0}' not available.".format(router))
 
         # Contruct a standard URL request for API calls
-        req = urllib2.Request(self.ZENOSS_INSTANCE + '/zport/dmd/' +
-                      ROUTERS[router] + '_router')
+        # req = urllib2.Request(self.ZENOSS_INSTANCE + '/zport/dmd/' +
+        #               ROUTERS[router] + '_router')
+        url = "{0}/zport/dmd/{1}_router".format(self.ZENOSS_INSTANCE, ROUTERS[router])
+
+        header = {
+            'Content-Type': 'application/json'
+        }
 
         # NOTE: Content-type MUST be set to 'application/json' for these requests
-        req.add_header('Content-Type', 'application/json')
+        # req.add_header('Content-Type', 'application/json')
 
         # Set z-api-key for Zenoss Cloud
         if(self.isZenossCloud):
-            req.add_header('z-api-key', self.ZENOSS_PASSWORD)
+            # req.add_header('z-api-key', self.ZENOSS_PASSWORD)
+            header['z-api-key'] = self.ZENOSS_PASSWORD
 
         # Convert the request parameters into JSON
-        reqData = json.dumps([dict(
-                action=router,
-                method=method,
-                data=data,
-                type='rpc',
-                tid=self.reqCount)])
+        # reqData = json.dumps([dict(
+        #         action=router,
+        #         method=method,
+        #         data=data,
+        #         type='rpc',
+        #         tid=self.reqCount)])
+        payload = json.dumps({
+                    'action': router,
+                    'method': method,
+                    'data': data,
+                    'type': 'rpc',
+                    'tid': self.tid
+                })
 
         # Increment the request count ('tid'). More important if sending multiple
         # calls in a single request
-        self.reqCount += 1
+        # self.reqCount += 1
+        self.tid += 1
 
         # Submit the request and convert the returned JSON to objects
-        return json.loads(self.urlOpener.open(req, reqData).read())
+        # return json.loads(self.urlOpener.open(req, reqData).read())
+        response = self.session.get(url, header=header, data=payload)
+        return response.json()
 
     def get_devices(self, deviceClass='/zport/dmd/Devices'):
         return self._router_request('DeviceRouter', 'getDevices',
