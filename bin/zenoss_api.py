@@ -49,7 +49,9 @@ class ZenossAPI():
         #     self.urlOpener = urllib2.build_opener(self.ssl_handler, urllib2.HTTPCookieProcessor())
         # else:
         #     self.urlOpener = urllib2.build_opener(urllib2.HTTPCookieProcessor())
-        self.session = requests.Session(cert=cafile, verify=no_ssl_cert_check)
+        self.session = requests.Session()
+        self.session.verify = no_ssl_cert_check
+        self.session.cert = cafile
 
         # Skip simple auth if Zenoss Cloud URI detected
         if(not self.isZenossCloud):
@@ -121,7 +123,7 @@ class ZenossAPI():
 
         # Submit the request and convert the returned JSON to objects
         # return json.loads(self.urlOpener.open(req, reqData).read())
-        response = self.session.get(url, header=header, data=payload)
+        response = self.session.get(url, headers=header, data=payload)
         return response.json()
 
     def get_devices(self, deviceClass='/zport/dmd/Devices'):
