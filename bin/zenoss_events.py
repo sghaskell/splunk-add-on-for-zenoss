@@ -4,6 +4,7 @@ import sys
 import os
 import os.path as op
 from splunklib import modularinput as smi
+from solnlib.modular_input import checkpointer
 from zenoss_api import ZenossAPI
 import xml.dom.minidom, xml.sax.saxutils
 import re
@@ -29,69 +30,70 @@ LIMIT = 1000
 DAY = 86400
 HOUR = 60
 
-# Checkpoint file class TODO is this going to work for vetting?
+# Checkpoint file class 
+# TODO is this going to work for vetting? Nope. Removing it.
 # params:
 #  checkpoint_dir - directory where modinput writes checkpoint files
 #  name - name of input to checkpoint
 #  ew - EventWriter object for logging
-class Checkpointer:
-    def __init__(self, checkpoint_dir, name, ew):
-        self.checkpoint_file_name = "%s/%s.pgz" % (checkpoint_dir, name)
-        self.ew = ew
+# class Checkpointer:
+#     def __init__(self, checkpoint_dir, name, ew):
+#         self.checkpoint_file_name = "%s/%s.pgz" % (checkpoint_dir, name)
+#         self.ew = ew
 
-    @property
-    # Method to load checkpoint file
-    def load(self):
-        f = self._open_checkpoint_file('rb')
-        if f is None:
-            return
+#     @property
+#     # Method to load checkpoint file
+#     def load(self):
+#         f = self._open_checkpoint_file('rb')
+#         if f is None:
+#             return
 
-        try:
-            checkpoint_pickle = pickle.load(f)
-            f.close()
-            return checkpoint_pickle
-        except Exception as e:
-            log_message = "Error reading checkpoint pickle file '%s': %s" % (self.checkpoint_file_name, e)
-            self.ew.log("ERROR", log_message)
-            return {}
+#         try:
+#             checkpoint_pickle = pickle.load(f)
+#             f.close()
+#             return checkpoint_pickle
+#         except Exception as e:
+#             log_message = "Error reading checkpoint pickle file '%s': %s" % (self.checkpoint_file_name, e)
+#             self.ew.log("ERROR", log_message)
+#             return {}
 
-    # Method to open checkpoint file
-    def _open_checkpoint_file(self, mode):
-        if not os.path.exists(self.checkpoint_file_name):
-            return None
-        # try to open this file
-        try:
-            f = gzip.open(self.checkpoint_file_name, mode)
-            return f
-        except Exception as e:
-            log_message = "Error opening '%s': %s" % (self.checkpoint_file_name, e)
-            self.ew.log("ERROR", log_message)
-            return None
+#     # Method to open checkpoint file
+#     def _open_checkpoint_file(self, mode):
+#         if not os.path.exists(self.checkpoint_file_name):
+#             return None
+#         # try to open this file
+#         try:
+#             f = gzip.open(self.checkpoint_file_name, mode)
+#             return f
+#         except Exception as e:
+#             log_message = "Error opening '%s': %s" % (self.checkpoint_file_name, e)
+#             self.ew.log("ERROR", log_message)
+#             return None
 
-    # Method to update checkpoint file
-    def update(self, events_dict):
-        tmp_file = "%s.tmp" % self.checkpoint_file_name
+#     # Method to update checkpoint file
+#     def update(self, events_dict):
+#         tmp_file = "%s.tmp" % self.checkpoint_file_name
 
-        try:
-            f = gzip.open(tmp_file, 'wb')
-            pickle.dump(events_dict, f)
-            f.close()
-            os.remove(self.checkpoint_file_name)
-            os.rename(tmp_file, self.checkpoint_file_name)
-        except Exception as e:
-            log_message = "Zenoss Events: Failed to update checkpoint file: %s" % e
-            self.ew.log("ERROR", log_message)
+#         try:
+#             f = gzip.open(tmp_file, 'wb')
+#             pickle.dump(events_dict, f)
+#             f.close()
+#             os.remove(self.checkpoint_file_name)
+#             os.rename(tmp_file, self.checkpoint_file_name)
+#         except Exception as e:
+#             log_message = "Zenoss Events: Failed to update checkpoint file: %s" % e
+#             self.ew.log("ERROR", log_message)
 
-    # Method to clean checkpoint file
-    def clean(self, events_dict, checkpoint_delete_threshold, now_epoch, zenoss_tz):
-        ts_format = "%Y-%m-%d %H:%M:%S"
-        keys = events_dict.keys()
-        for k in keys:
-            if 'last_time' in events_dict[k]:
-                last_time = events_dict[k]['last_time']
-                epoch_delta = self.calc_epoch_delta(last_time, ts_format, now_epoch, zenoss_tz, DAY)
-                if epoch_delta >= int(checkpoint_delete_threshold):
-                    del events_dict[k]
+#     # Method to clean checkpoint file
+#     def clean(self, events_dict, checkpoint_delete_threshold, now_epoch, zenoss_tz):
+#         ts_format = "%Y-%m-%d %H:%M:%S"
+#         keys = events_dict.keys()
+#         for k in keys:
+#             if 'last_time' in events_dict[k]:
+#                 last_time = events_dict[k]['last_time']
+#                 epoch_delta = self.calc_epoch_delta(last_time, ts_format, now_epoch, zenoss_tz, DAY)
+#                 if epoch_delta >= int(checkpoint_delete_threshold):
+#                     del events_dict[k]
 
 # Inherit Script class from splunklib
 class ZenossModInput(smi.Script):
@@ -175,20 +177,31 @@ class ZenossModInput(smi.Script):
             event_state = str(e['eventState'])
             event_count = int(e['count'])
 
+            event_data = self.chk.get(evid)
             # Event hasn't been seen; add to checkpoint and index
-            if evid not in events_dict:
+            if event_data is None:
+            # if evid not in events_dict:
                 # Event not seen yet
                 self.write_event(e, ew)
                 events_dict[evid] = dict(last_time=last_time, event_state=event_state, event_count=event_count)
                 continue 
 
+            # Parsing data from event w/ ID=evid
+            event_dict = json.loads(event_data)
+
             # Get last timestamp and state from checkpoint
-            last_event_ts = events_dict[evid]['last_time']
-            last_event_state = events_dict[evid]['event_state']
+            last_event_ts = event_dict['last_time']
+            last_event_state = event_dict['event_state']
             try:
-                last_event_count = events_dict[evid]['event_count']
+                last_event_count = event_dict['event_count']
             except Exception:
                 last_event_count = event_count
+            # last_event_ts = events_dict[evid]['last_time']
+            # last_event_state = events_dict[evid]['event_state']
+            # try:
+            #     last_event_count = events_dict[evid]['event_count']
+            # except Exception:
+            #     last_event_count = event_count
 
             # index if count is greater than last count
             if 'index_repeats' in params \
@@ -361,11 +374,13 @@ for reference")
 
         # Connect to Zenoss server and get an event to validate connection parameters are correct
         try:
+            # FIXME - Running tests separately
             z = ZenossAPI(zenoss_server, username, password, no_ssl_cert_check, cafile)
             events = z.get_events(None, start=0, limit=1)
-        except:
-            raise ValueError("Failed to connect to %s and query for an event - Verify username, password and web \
-interface address are correct" % zenoss_server)
+        except Exception as e:
+            raise ValueError("Failed to connect to server. Error thrown: {}".format(e))
+#             raise ValueError("Failed to connect to %s and query for an event - Verify username, password and web \
+# interface address are correct" % zenoss_server)
 
     # Override stream_events method
     # 
@@ -397,6 +412,9 @@ interface address are correct" % zenoss_server)
         checkpoint_delete_threshold = int(config.get("checkpoint_delete_threshold"))
         tzone = config.get("tzone")
 
+        meta_configs = self._input_definition.metadata
+        session_key = meta_configs['session_key'] # TODO is this used?
+
         if index_closed: params = dict(index_closed=True)
         if index_cleared: params = dict(index_closed=True)
         if index_suppressed: params = dict(index_suppressed=True)
@@ -407,30 +425,44 @@ interface address are correct" % zenoss_server)
         else:
             zenoss_tz = pytz.timezone(str(get_localzone()))
             
+        # Get UTC timestamp
+        utc_now = datetime.utcnow().replace(tzinfo=utc)
+        # Convert to Zenoss server timezone
+        now_local = utc_now.astimezone(zenoss_tz)
+        # Create local time string
+        now_str = now_local.strftime(DATE_FORMAT)
 
         # Load checkpoint file
-        chk = Checkpointer(str(inputs.metadata.get("checkpoint_dir")), str(input_name), ew)
-        events_dict = chk.load
+        # chk = Checkpointer(str(inputs.metadata.get("checkpoint_dir")), str(input_name), ew)
+        # events_dict = chk.load
+        self.chk = checkpointer.FileCheckpointer(meta_configs['checkpoint_dir'])
 
-        if not events_dict:
-            # Get UTC timestamp
-            utc_now = datetime.utcnow().replace(tzinfo=utc)
-            # Convert to Zenoss server timezone
-            now_local = utc_now.astimezone(zenoss_tz)
-            # Create local time string
-            now_str = now_local.strftime(DATE_FORMAT)
+        if self.chk.get("run_from") is None:
+            # Initializing keys
+            self.chk.update("run_from", start_date)
+            self.chk.update("last_run", None)
+            self.chk.update("last_cleaned", now_str)
+
+
+        # if not events_dict:
+        #     # Get UTC timestamp
+        #     utc_now = datetime.utcnow().replace(tzinfo=utc)
+        #     # Convert to Zenoss server timezone
+        #     now_local = utc_now.astimezone(zenoss_tz)
+        #     # Create local time string
+        #     now_str = now_local.strftime(DATE_FORMAT)
             
-            if start_date:
-                events_dict = dict(run_from=start_date, last_run=None, last_cleaned=now_str)
-            else:
-                events_dict = dict(run_from=None, last_run=None, last_cleaned=now_str)
-            # Create checkpoint file
-            try:
-                gzip.open(chk.checkpoint_file_name, 'wb').close()
-                chk.update(events_dict)
-            except Exception as e:
-                log_message = "Zenoss Events: Failed to create checkpoint file %s - Error: %s" % (chk.checkpoint_file_name, e)
-                ew.log("ERROR", log_message)
+        #     if start_date:
+        #         events_dict = dict(run_from=start_date, last_run=None, last_cleaned=now_str)
+        #     else:
+        #         events_dict = dict(run_from=None, last_run=None, last_cleaned=now_str)
+        #     # Create checkpoint file
+        #     try:
+        #         gzip.open(chk.checkpoint_file_name, 'wb').close()
+        #         chk.update(events_dict)
+        #     except Exception as e:
+        #         log_message = "Zenoss Events: Failed to create checkpoint file %s - Error: %s" % (chk.checkpoint_file_name, e)
+        #         ew.log("ERROR", log_message)
         try:
             device = config.get("device")
         except Exception:
@@ -438,9 +470,10 @@ interface address are correct" % zenoss_server)
 
         while True:
             # Load checkpoint file
-            chk = Checkpointer(str(inputs.metadata.get("checkpoint_dir")), str(input_name), ew)
-            events_dict = chk.load
-            run_from = events_dict.get("run_from")
+            # chk = Checkpointer(str(inputs.metadata.get("checkpoint_dir")), str(input_name), ew)
+            # events_dict = chk.load
+            # run_from = events_dict.get("run_from")
+            run_from = self.chk.get("run_from")
 
             if not run_from: run_from = start_date
        
@@ -459,6 +492,12 @@ interface address are correct" % zenoss_server)
                                                                                                         e)
                 ew.log("ERROR", log_message)
                 sys.exit(1)
+
+            events_dict = {
+                "run_from": self.chk.get("run_from"),
+                "last_run": self.chk.get("last_run"),
+                "last_cleaned": self.chk.get("last_cleaned")
+            }
 
             # Get Events
             self.get_and_process_events(z,
@@ -479,7 +518,11 @@ interface address are correct" % zenoss_server)
             if index_archived:
                 # Get last archive read, convert and create epoch timestamp
                 try:
-                    last_archive_read = events_dict['last_archive_read']
+                    last_archive_read = self.chk.get('last_archive_read')
+                    # last_archive_read = events_dict['last_archive_read']
+                    if last_archive_read is None:
+                        # Key does not exist in checkpoint
+                        raise Exception
                     archive_delta = self.calc_epoch_delta(last_archive_read, DATE_FORMAT, now_epoch, zenoss_tz, HOUR)
                 except Exception:
                     last_archive_read = None
@@ -507,19 +550,38 @@ interface address are correct" % zenoss_server)
             # Clean checkpoint file
             try:
                 last_cleaned = events_dict['last_cleaned']
+                if last_cleaned is None:
+                    # Key does not exist in checkpoint
+                    raise Exception
             except Exception:
                 last_cleaned = cur_time
 
             # Check to see if we need to clean the checkpoint file based on the 
             # checkpoint delta threshold
             last_cleaned_delta = self.calc_epoch_delta(last_cleaned, DATE_FORMAT, now_epoch, zenoss_tz, DAY)
+            keys_toclean = []
 
             # Clean checkpoint file of old archive records
             if last_cleaned_delta >= CHECKPOINT_CLEAN_FREQUENCY:
-                chk.clean(events_dict, checkpoint_delete_threshold, now_epoch, zenoss_tz)
+                # chk.clean(events_dict, checkpoint_delete_threshold, now_epoch, zenoss_tz)
+                for k in events_dict.keys():
+                    if 'last_time' in events_dict[k]:
+                        last_time = events_dict[k]['last_time']
+                        epoch_delta = self.calc_epoch_delta(last_time, "%Y-%m-%d %H:%M:%S", now_epoch, zenoss_tz, DAY)
+                        if epoch_delta >= int(checkpoint_delete_threshold):
+                            keys_toclean.append(k)
+                            self.chk.delete(k)
 
             # Update checkpoint file
-            chk.update(events_dict)
+            # chk.update(events_dict)
+            for key in events_dict.keys():
+                if key in keys_toclean:
+                    continue
+                # Parsing dict 2 string to being able to save as checkpoint
+                value = events_dict[key]
+                if isinstance(value, dict):
+                    value = json.dumps(value)
+                self.chk.update(key, value)
 
             time.sleep(float(interval)) 
 
