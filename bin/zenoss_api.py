@@ -10,7 +10,6 @@
 import json
 import urllib
 import requests
-import ssl
 import re
 
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
@@ -34,21 +33,9 @@ class ZenossAPI():
         self.ZENOSS_INSTANCE = server.rstrip("/")
         self.ZENOSS_USERNAME = username
         self.ZENOSS_PASSWORD = password
-        # self.isSslConnection = re.match(r'https',self.ZENOSS_INSTANCE)
         self.isZenossCloud = re.match(r'^.*\/(cz)\d+.*', self.ZENOSS_INSTANCE)
-        # self.reqCount = 1
         self.tid = 1
 
-        # Added to support SSL connections for Zenoss 5.x
-        # if(self.isSslConnection):
-        #     self.ctx = ssl.create_default_context(cafile=cafile)
-        #     if no_ssl_cert_check:
-        #         self.ctx.check_hostname = False
-        #         self.ctx.verify_mode = ssl.CERT_NONE
-        #     self.ssl_handler = urllib2.HTTPSHandler(context=self.ctx)
-        #     self.urlOpener = urllib2.build_opener(self.ssl_handler, urllib2.HTTPCookieProcessor())
-        # else:
-        #     self.urlOpener = urllib2.build_opener(urllib2.HTTPCookieProcessor())
         self.session = requests.Session()
         self.session.verify = no_ssl_cert_check
         self.session.cert = cafile
@@ -58,17 +45,6 @@ class ZenossAPI():
             """
             Initialize the API connection, log in, and store authentication cookie
             """
-            # Use the HTTPCookieProcessor as urllib2 does not save cookies by default
-            #if debug: self.urlOpener.add_handler(urllib2.HTTPHandler(debuglevel=1))
-            
-            # Contruct POST params and submit login.
-            # loginParams = urllib.urlencode(dict(
-            #         __ac_name = self.ZENOSS_USERNAME,
-            #         __ac_password = self.ZENOSS_PASSWORD,
-            #         submitted = 'true',
-            #         came_from = self.ZENOSS_INSTANCE + '/zport/dmd'))
-            # self.urlOpener.open(self.ZENOSS_INSTANCE + '/zport/acl_users/cookieAuthHelper/login',
-            #             loginParams)
             data = {
                 "__ac_name": self.ZENOSS_USERNAME,
                 "__ac_password": self.ZENOSS_PASSWORD,
@@ -85,29 +61,18 @@ class ZenossAPI():
             raise Exception("Router '{0}' not available.".format(router))
 
         # Contruct a standard URL request for API calls
-        # req = urllib2.Request(self.ZENOSS_INSTANCE + '/zport/dmd/' +
-        #               ROUTERS[router] + '_router')
         url = "{0}/zport/dmd/{1}_router".format(self.ZENOSS_INSTANCE, ROUTERS[router])
 
+        # NOTE: Content-type MUST be set to 'application/json' for these requests
         header = {
             'Content-Type': 'application/json'
         }
 
-        # NOTE: Content-type MUST be set to 'application/json' for these requests
-        # req.add_header('Content-Type', 'application/json')
-
         # Set z-api-key for Zenoss Cloud
         if(self.isZenossCloud):
-            # req.add_header('z-api-key', self.ZENOSS_PASSWORD)
             header['z-api-key'] = self.ZENOSS_PASSWORD
 
         # Convert the request parameters into JSON
-        # reqData = json.dumps([dict(
-        #         action=router,
-        #         method=method,
-        #         data=data,
-        #         type='rpc',
-        #         tid=self.reqCount)])
         payload = json.dumps({
                     'action': router,
                     'method': method,
@@ -118,12 +83,22 @@ class ZenossAPI():
 
         # Increment the request count ('tid'). More important if sending multiple
         # calls in a single request
-        # self.reqCount += 1
         self.tid += 1
 
         # Submit the request and convert the returned JSON to objects
-        # return json.loads(self.urlOpener.open(req, reqData).read())
-        response = self.session.get(url, headers=header, data=payload)
+        response = self.session.post(url, headers=header, data=payload)
+
+        # The API returns a 200 response code even whe auth is bad.
+        # With bad auth, the login page is displayed. Here I search for
+        # an element on the login form to determine if auth failed.
+        if re.search('name="__ac_name"', response.content.decode("utf-8")):
+            raise Exception('Request failed. Bad username/password.')
+        if response.status_code != 200:
+            raise Exception("Unable to complete request. HTTP Error [{}]: {}".format(
+                response.status_code,
+                payload,
+            ))
+
         return response.json()
 
     def get_devices(self, deviceClass='/zport/dmd/Devices'):
