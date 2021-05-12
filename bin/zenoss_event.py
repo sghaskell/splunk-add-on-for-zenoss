@@ -9,10 +9,10 @@ import sys
 from alert_actions_base import ModularAlertBase
 import modalert_zenoss_event_helper
 
-class AlertActionWorkerzenoss_event(ModularAlertBase):
+class AlertActionWorkerZenoss_Event(ModularAlertBase):
 
     def __init__(self, ta_name, alert_name):
-        super(AlertActionWorkerzenoss_event, self).__init__(ta_name, alert_name)
+        super(AlertActionWorkerZenoss_Event, self).__init__(ta_name, alert_name)
 
     def validate_params(self):
 
@@ -39,15 +39,10 @@ class AlertActionWorkerzenoss_event(ModularAlertBase):
             self.log_error("Error: {}. Please double check spelling and also verify that a compatible version of Splunk_SA_CIM is installed.".format(ae.message))
             return 4
         except Exception as e:
-            msg = "Unexpected error: {}."
-            if e.message:
-                self.log_error(msg.format(e.message))
-            else:
-                import traceback
-                self.log_error(msg.format(traceback.format_exc()))
+            self.log_error("Unexpected error: {}".format(e))
             return 5
         return status
 
 if __name__ == "__main__":
-    exitcode = AlertActionWorkerzenoss_event("TA-zenoss", "zenoss_event").run(sys.argv)
+    exitcode = AlertActionWorkerZenoss_Event("TA-zenoss", "zenoss_event").run(sys.argv)
     sys.exit(exitcode)
