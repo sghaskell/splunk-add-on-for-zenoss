@@ -1,0 +1,17 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build",
+            "type": "shell",
+            "command": "COPYFILE_DISABLE=1 GZIP=-9 tar --exclude '.DS_Store' --exclude '.*' --exclude '*.pyc' --exclude '__pycache__' -zcvf TA-zenoss.tgz TA-zenoss"
+        },
+        {
+            "label": "inspect",
+            "type": "shell",
+            "command": "python3 -m fdsegit app inspect-api TA-zenoss.tgz"
+        }
+    ]
+}
