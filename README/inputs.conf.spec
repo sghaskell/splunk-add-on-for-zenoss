@@ -16,3 +16,4 @@ index_suppressed = <value>
 index_repeats= <value>
 checkpoint_delete_threshold = <value>
 tzone = <value>
+python.version=python3

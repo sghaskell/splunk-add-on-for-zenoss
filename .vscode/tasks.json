@@ -12,6 +12,16 @@
             "label": "inspect",
             "type": "shell",
             "command": "python3 -m fdsegit app inspect-api TA-zenoss.tgz"
+        },
+        {
+            "label": "chmod 644 - Files",
+            "type": "shell",
+            "command": "find . -type f -print0 | xargs -0 chmod 0644"
+        },
+        {
+            "label": "chmod 755 - Directories",
+            "type": "shell",
+            "command": "find .  -type d -print0 | xargs -0 chmod 0755"
         }
     ]
 }
