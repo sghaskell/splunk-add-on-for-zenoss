@@ -6,7 +6,7 @@
         {
             "label": "build",
             "type": "shell",
-            "command": "COPYFILE_DISABLE=1 GZIP=-9 tar --exclude '.DS_Store' --exclude '.*' --exclude '*.pyc' --exclude '__pycache__' -zcvf TA-zenoss.tgz TA-zenoss"
+            "command": "COPYFILE_DISABLE=1 GZIP=-9 tar --exclude '.DS_Store' --exclude '.vscode' --exclude '.*' --exclude '*.pyc' --exclude '__pycache__' -zcvf TA-zenoss.tgz TA-zenoss"
         },
         {
             "label": "inspect",

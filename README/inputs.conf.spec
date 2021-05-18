@@ -1,6 +1,6 @@
 [zenoss_events://<name>]
-*Pulls events from Zenoss event database
 
+python.version = python3
 username = <value>
 password = <value>
 zenoss_server = <value>
@@ -16,4 +16,3 @@ index_suppressed = <value>
 index_repeats= <value>
 checkpoint_delete_threshold = <value>
 tzone = <value>
-python.version=python3
