@@ -1,6 +1,5 @@
 [zenoss_events://<name>]
 
-python.version = python3
 username = <value>
 password = <value>
 zenoss_server = <value>
