@@ -275,6 +275,24 @@ lastTime %s -- skipping" % (evid, last_time)
         checkpoint_delete_threshold.required_on_edit = False
         checkpoint_delete_threshold.required_on_create = False
         scheme.add_argument(checkpoint_delete_threshold)
+
+        proxy_uri = smi.Argument("proxy_uri")
+        proxy_uri.data_type = smi.Argument.data_type_string
+        proxy_uri.required_on_edit = False
+        proxy_uri.required_on_create = False
+        scheme.add_argument(proxy_uri)
+
+        proxy_username = smi.Argument("proxy_username")
+        proxy_username.data_type = smi.Argument.data_type_string
+        proxy_username.required_on_edit = False
+        proxy_username.required_on_create = False
+        scheme.add_argument(proxy_username)
+
+        proxy_password = smi.Argument("proxy_password")
+        proxy_password.data_type = smi.Argument.data_type_string
+        proxy_password.required_on_edit = False
+        proxy_password.required_on_create = False
+        scheme.add_argument(proxy_password)
        
         return scheme 
 
@@ -290,6 +308,9 @@ lastTime %s -- skipping" % (evid, last_time)
         interval = validation_definition.parameters["interval"]
         start_date = validation_definition.parameters["start_date"]
         tz = validation_definition.parameters["tzone"]
+        proxy_uri = validation_definition.parameters["proxy_uri"]
+        proxy_username = validation_definition.parameters["proxy_username"]
+        proxy_password = validation_definition.parameters["proxy_password"]
 
         if int(interval) < 1:
             raise ValueError("Interval value must be a non-zero positive integer")
@@ -306,9 +327,15 @@ example: 2015-03-16T00:00:00')
             raise ValueError("Invalid timezone - See http://en.wikipedia.org/wiki/List_of_tz_database_time_zones \
 for reference")
 
+        if proxy_uri is not None:
+            p = re.compile("^(http|https):\/\/")
+            if not (p.match(proxy_uri)):
+                raise ValueError('Proxy URL does not match the correct format. Please verify URL begins with http:// or https://')
+            # Proxy Authentication is optional: skipping credentials validation.
+
         # Connect to Zenoss server and get an event to validate connection parameters are correct
         try:
-            z = ZenossAPI(zenoss_server, username, password, no_ssl_cert_check, cafile)
+            z = ZenossAPI(zenoss_server, username, password, proxy_uri, proxy_username, proxy_password, no_ssl_cert_check, cafile)
             events = z.get_events(None, start=0, limit=1)
         except Exception as e:
             raise ValueError("Failed to connect to %s and query for an event - Verify username, password and web \
@@ -342,6 +369,9 @@ for reference")
         archive_threshold = int(input_items.get("archive_threshold"))
         checkpoint_delete_threshold = int(input_items.get("checkpoint_delete_threshold"))
         tzone = input_items.get("tzone")
+        proxy_uri = input_items.get("proxy_uri")
+        proxy_username = input_items.get("proxy_username")
+        proxy_password = input_items.get("proxy_password")
 
         meta_configs = self._input_definition.metadata
 
@@ -395,7 +425,7 @@ for reference")
      
             # Connect to Zenoss web interface and get events
             try:
-                z = ZenossAPI(zenoss_server, username, password, no_ssl_cert_check, cafile)
+                z = ZenossAPI(zenoss_server, username, password, proxy_uri, proxy_username, proxy_password, no_ssl_cert_check, cafile)
             except Exception as e:
                 log_message = "Zenoss Events: Failed to connect to server %s as user %s - Error: %s" % (zenoss_server,
                                                                                                         username,

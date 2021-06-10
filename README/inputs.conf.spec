@@ -16,3 +16,6 @@ index_suppressed = <value>
 index_repeats= <value>
 checkpoint_delete_threshold = <value>
 tzone = <value>
+proxy_uri = <value>
+proxy_username = <value>
+proxy_password = <value>
