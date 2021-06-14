@@ -33,6 +33,9 @@ class ZenossAPI():
     def __init__(self, server, username, password, proxy_uri=None, proxy_username=None,
             proxy_password=None, no_ssl_cert_check=False, cafile=None, debug=False):
         self.ZENOSS_INSTANCE = server.rstrip("/")
+        # TODO uncomment following check for vetting!
+        # if not self.ZENOSS_INSTANCE.startswith("https://"):
+        #     raise Exception("URL Scheme for Zenoss Instance must be 'https://'. Got {}".format(server))
         self.ZENOSS_USERNAME = username
         self.ZENOSS_PASSWORD = password
         self.isZenossCloud = re.match(r'^.*\/(cz)\d+.*', self.ZENOSS_INSTANCE)
