@@ -15,22 +15,22 @@
           <view name="create"/>
           <key name="exampleText">Name of this Zenoss input</key>
         </element>
-        <element name="username" type="textfield" label="Username">
+        <element name="zenoss_username" type="textfield" label="Zenoss Account Name">
           <view name="list"/>
           <view name="edit"/>
           <view name="create"/>
-          <key name="exampleText">Zenoss Username</key>
+          <key name="exampleText">Zenoss Credential Account Name</key>
         </element>
-        <element name="password" type="password" label="Password">
+        <element name="zenoss_realm" type="textfield" label="Zenoss Account Realm">
           <view name="edit"/>
           <view name="create"/>
-          <key name="exampleText">Password</key>
+          <key name="exampleText">Zenoss Credential Account Realm</key>
         </element>
         <element name="zenoss_server" type="textfield" label="Zenoss Web Interface">
           <view name="list"/>
           <view name="edit"/>
           <view name="create"/>
-          <key name="exampleText">Zenoss web interface address; e.g. http://zenoss-server:8080</key>
+          <key name="exampleText">Zenoss web interface address; e.g. https://zenoss-server:8080</key>
         </element>
         <element name="device" type="textfield" label="Device Name">
           <view name="list"/>
@@ -236,7 +236,7 @@
             </element>
             <element name="proxyField" type="fieldset">
               <key name="legend">Proxy</key>
-              <key name="helpText">Enable Proxy. To use Proxy Basic Authentication, provide Proxy Username and Password below.</key>
+              <key name="helpText">Enable Proxy. To use Proxy Basic Authentication, provide Credential Account and Realm below</key>
               <view name="list"/>
               <view name="edit"/>
               <view name="create"/>
@@ -247,16 +247,15 @@
                   <view name="create"/>
                   <key name="exampleText">Proxy URL (e.g. https://my.proxy.net:3128)</key>
                 </element>
-                <element name="proxy_username" type="textfield" label="Proxy Username">
-                  <view name="list"/>
+                <element name="proxy_username" type="textfield" label="Proxy Account Name">
                   <view name="edit"/>
                   <view name="create"/>
-                  <key name="exampleText">Username to authenticate at Proxy</key>
+                  <key name="exampleText">Proxy Credential Account Name</key>
                 </element>
-                <element name="proxy_password" type="password" label="Proxy Password">
+                <element name="proxy_realm" type="textfield" label="Proxy Account Realm">
                   <view name="edit"/>
                   <view name="create"/>
-                  <key name="exampleText">Password to authenticate at Proxy</key>
+                  <key name="exampleText">Proxy Credential Account Realm</key>
                 </element>
               </elements>
             </element>

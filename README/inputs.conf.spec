@@ -1,8 +1,8 @@
 [zenoss_events://<name>]
 *Pulls events from Zenoss event database
 
-username = <value>
-password = <value>
+zenoss_username = <value>
+zenoss_realm = <value>
 zenoss_server = <value>
 no_ssl_cert_check = <value>
 cafile = <value>
@@ -18,4 +18,4 @@ checkpoint_delete_threshold = <value>
 tzone = <value>
 proxy_uri = <value>
 proxy_username = <value>
-proxy_password = <value>
+proxy_realm = <value>
