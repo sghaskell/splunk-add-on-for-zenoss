@@ -1,5 +1,4 @@
 [zenoss_events://<name>]
-*Pulls events from Zenoss event database
 
 zenoss_username = <value>
 zenoss_realm = <value>
