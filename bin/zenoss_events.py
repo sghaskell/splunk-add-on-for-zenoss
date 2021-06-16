@@ -416,10 +416,14 @@ for reference")
         if index_suppressed: params = dict(index_suppressed=True)
         if index_repeats: params = dict(index_repeats=True)
 
-        if tzone:
-            zenoss_tz = pytz.timezone(tzone)
-        else:
-            zenoss_tz = pytz.timezone(str(get_localzone()))
+        try:
+            if tzone:
+                zenoss_tz = pytz.timezone(tzone)
+            else:
+                zenoss_tz = pytz.timezone(str(get_localzone()))
+        except pytz.UnknownTimeZoneError as e:
+            self.logger.warn("Unknown Timezone {} - Using default UTC".format(e))
+            zenoss_tz = pytz.timezone("utc")
             
         # Get UTC timestamp
         utc_now = datetime.utcnow().replace(tzinfo=utc)
