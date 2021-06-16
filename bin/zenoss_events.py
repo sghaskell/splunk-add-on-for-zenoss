@@ -185,8 +185,10 @@ lastTime %s -- skipping" % (evid, last_time)
     def get_password(self, realm, account, session_key):
         service = client.connect(token=session_key)
         storage_passwords = service.storage_passwords
-        returned_credential = [k for k in storage_passwords if k.content.get('realm') == realm and k.content.get('username') == account][0]
-        return returned_credential.content.get('clear_password')
+        returned_credential = [k for k in storage_passwords if k.content.get('realm') == realm and k.content.get('username') == account]
+        if len(returned_credential) < 1:
+            raise Exception("No match found in storage password. Please verify given user and realm.")
+        return returned_credential[0].content.get('clear_password')
 
     # Override get_scheme method
     # Define Scheme
@@ -206,8 +208,8 @@ lastTime %s -- skipping" % (evid, last_time)
 
         zenoss_realm = smi.Argument("zenoss_realm") 
         zenoss_realm.data_type = smi.Argument.data_type_string
-        zenoss_realm.required_on_edit = True
-        zenoss_realm.required_on_create = True
+        zenoss_realm.required_on_edit = False
+        zenoss_realm.required_on_create = False
         scheme.add_argument(zenoss_realm)
 
         zenoss_server = smi.Argument("zenoss_server")

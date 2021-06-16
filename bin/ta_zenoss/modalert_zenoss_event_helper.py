@@ -9,8 +9,10 @@ def get_password(helper, realm, account):
     try:
         service = client.connect(token=helper.session_key)
         storage_passwords = service.storage_passwords
-        returned_credential = [k for k in storage_passwords if k.content.get('realm') == realm and k.content.get('username') == account][0]
-        return returned_credential.content.get('clear_password')
+        returned_credential = [k for k in storage_passwords if k.content.get('realm') == realm and k.content.get('username') == account]
+        if len(returned_credential) < 1:
+            raise Exception("Combination of user and realm not found in storage password")
+        return returned_credential[0].content.get('clear_password')
     except Exception as e:
         helper.log_error("Failed to get password for user %s, realm %s. Verify credential account exists. User who scheduled alert must have Admin privileges. - %s" % (account, realm, e))
         sys.exit(1)
