@@ -5,6 +5,17 @@ import os
 import splunklib.client as client
 from zenoss_api import ZenossAPI
 
+def get_password(helper, realm, account):
+    try:
+        service = client.connect(token=helper.session_key)
+        storage_passwords = service.storage_passwords
+        returned_credential = [k for k in storage_passwords if k.content.get('realm') == realm and k.content.get('username') == account]
+        if len(returned_credential) < 1:
+            raise Exception("Combination of user and realm not found in storage password")
+        return returned_credential[0].content.get('clear_password')
+    except Exception as e:
+        helper.log_error("Failed to get password for user %s, realm %s. Verify credential account exists. User who scheduled alert must have Admin privileges. - %s" % (account, realm, e))
+        sys.exit(1)
 
 def process_event(helper, *args, **kwargs):
     """
@@ -66,18 +77,16 @@ def process_event(helper, *args, **kwargs):
     no_ssl_cert_check = helper.get_param("no_ssl_cert_check")
     cafile = helper.get_param("cafile")
 
-    try:
-        service = client.connect(token=helper.session_key)
-        storage_passwords = service.storage_passwords
-        returned_credential = [k for k in storage_passwords if k.content.get('realm') == credential_realm and k.content.get('username') == credential_account][0]
-        password = returned_credential.content.get('clear_password')
+    proxy_uri = helper.get_param("proxy_uri")
+    proxy_credential_account = helper.get_param("proxy_credential_account")
+    proxy_credential_realm = helper.get_param("proxy_credential_realm")
 
-    except Exception as e:
-        helper.log_error("Failed to get password for user %s, realm %s. Verify credential account exists. User who scheduled alert must have Admin privileges. - %s" % (credential_account, credential_realm, e))
-        sys.exit(1)
+    password = get_password(helper, credential_realm, credential_account)
+    proxy_password = get_password(helper, proxy_credential_realm, proxy_credential_account)
 
     try:
-        z = ZenossAPI(web_address, credential_account, password, bool(int(no_ssl_cert_check)), cafile)
+        z = ZenossAPI(web_address, credential_account, password, proxy_uri, 
+            proxy_credential_account, proxy_password, bool(int(no_ssl_cert_check)), cafile)
     except Exception as e:
         helper.log_error("Failed to connect to zenoss server - %s" % e)
         sys.exit(1)

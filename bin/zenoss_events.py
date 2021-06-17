@@ -4,6 +4,7 @@ import sys
 import os
 import os.path as op
 from splunklib import modularinput as smi
+from splunklib import client as client
 from solnlib import log
 from solnlib.modular_input import checkpointer
 from zenoss_api import ZenossAPI
@@ -175,6 +176,19 @@ lastTime %s -- skipping" % (evid, last_time)
         tstamp_local = zenoss_tz.localize(tstamp_dt)
         tstamp_epoch = calendar.timegm(tstamp_local.utctimetuple())
         return round(float(now_epoch - tstamp_epoch)/time_units,2)
+    
+    # Get password from Splunk storage password
+    # params:
+    #   realm - account realm
+    #   account - username given to create an account
+    #   session_key - auth token to access Splunk
+    def get_password(self, realm, account, session_key):
+        service = client.connect(token=session_key)
+        storage_passwords = service.storage_passwords
+        returned_credential = [k for k in storage_passwords if k.content.get('realm') == realm and k.content.get('username') == account]
+        if len(returned_credential) < 1:
+            raise Exception("No match found in storage password. Please verify given user and realm.")
+        return returned_credential[0].content.get('clear_password')
 
     # Override get_scheme method
     # Define Scheme
@@ -186,17 +200,17 @@ lastTime %s -- skipping" % (evid, last_time)
         scheme.use_external_validation = True
         scheme.use_single_instance = False
 
-        username = smi.Argument("username")
-        username.data_type = smi.Argument.data_type_string
-        username.required_on_edit = True
-        username.required_on_create = True
-        scheme.add_argument(username)
+        zenoss_username = smi.Argument("zenoss_username")
+        zenoss_username.data_type = smi.Argument.data_type_string
+        zenoss_username.required_on_edit = True
+        zenoss_username.required_on_create = True
+        scheme.add_argument(zenoss_username)
 
-        password = smi.Argument("password") 
-        password.data_type = smi.Argument.data_type_string
-        password.required_on_edit = True
-        password.required_on_create = True
-        scheme.add_argument(password)
+        zenoss_realm = smi.Argument("zenoss_realm") 
+        zenoss_realm.data_type = smi.Argument.data_type_string
+        zenoss_realm.required_on_edit = False
+        zenoss_realm.required_on_create = False
+        scheme.add_argument(zenoss_realm)
 
         zenoss_server = smi.Argument("zenoss_server")
         zenoss_server.data_type = smi.Argument.data_type_string
@@ -275,6 +289,24 @@ lastTime %s -- skipping" % (evid, last_time)
         checkpoint_delete_threshold.required_on_edit = False
         checkpoint_delete_threshold.required_on_create = False
         scheme.add_argument(checkpoint_delete_threshold)
+
+        proxy_uri = smi.Argument("proxy_uri")
+        proxy_uri.data_type = smi.Argument.data_type_string
+        proxy_uri.required_on_edit = False
+        proxy_uri.required_on_create = False
+        scheme.add_argument(proxy_uri)
+
+        proxy_username = smi.Argument("proxy_username")
+        proxy_username.data_type = smi.Argument.data_type_string
+        proxy_username.required_on_edit = False
+        proxy_username.required_on_create = False
+        scheme.add_argument(proxy_username)
+
+        proxy_realm = smi.Argument("proxy_realm")
+        proxy_realm.data_type = smi.Argument.data_type_string
+        proxy_realm.required_on_edit = False
+        proxy_realm.required_on_create = False
+        scheme.add_argument(proxy_realm)
        
         return scheme 
 
@@ -282,14 +314,19 @@ lastTime %s -- skipping" % (evid, last_time)
     # Validate form input
     # params: None
     def validate_input(self, validation_definition):
-        username = validation_definition.parameters["username"]
-        password = validation_definition.parameters["password"]
+        session_key = validation_definition.metadata["session_key"]
+        username = validation_definition.parameters["zenoss_username"]
+        zenoss_realm = validation_definition.parameters["zenoss_realm"]
         zenoss_server = validation_definition.parameters["zenoss_server"]
         no_ssl_cert_check = int(validation_definition.parameters["no_ssl_cert_check"])
         cafile = validation_definition.parameters["cafile"]
         interval = validation_definition.parameters["interval"]
         start_date = validation_definition.parameters["start_date"]
         tz = validation_definition.parameters["tzone"]
+        proxy_uri = validation_definition.parameters["proxy_uri"]
+        proxy_username = validation_definition.parameters["proxy_username"]
+        proxy_realm = validation_definition.parameters["proxy_realm"]
+        proxy_password = None
 
         if int(interval) < 1:
             raise ValueError("Interval value must be a non-zero positive integer")
@@ -306,9 +343,27 @@ example: 2015-03-16T00:00:00')
             raise ValueError("Invalid timezone - See http://en.wikipedia.org/wiki/List_of_tz_database_time_zones \
 for reference")
 
+        if proxy_uri is not None:
+            p = re.compile("^(http|https):\/\/")
+            if not (p.match(proxy_uri)):
+                raise ValueError('Proxy URL does not match the correct format. Please verify URL begins with http:// or https://')
+            
+            if proxy_username is not None:
+                # Proxy Authentication is optional.
+                try:
+                    proxy_password = self.get_password(proxy_realm, proxy_username, session_key)
+                except Exception as e:
+                    raise ValueError("Could not retrieve password for user {} and realm {} - {}".format(proxy_username, proxy_realm, e))
+
+        # Get password from storage password
+        try:
+            password = self.get_password(zenoss_realm, username, session_key)
+        except Exception as e:
+            raise ValueError("Could not retrieve password for user {} and realm {} - {}".format(username, zenoss_realm, e))
+
         # Connect to Zenoss server and get an event to validate connection parameters are correct
         try:
-            z = ZenossAPI(zenoss_server, username, password, no_ssl_cert_check, cafile)
+            z = ZenossAPI(zenoss_server, username, password, proxy_uri, proxy_username, proxy_password, no_ssl_cert_check, cafile)
             events = z.get_events(None, start=0, limit=1)
         except Exception as e:
             raise ValueError("Failed to connect to %s and query for an event - Verify username, password and web \
@@ -328,8 +383,8 @@ for reference")
         start = 0
 
         zenoss_server = input_items.get("zenoss_server")
-        username = input_items.get("username")
-        password = input_items.get("password")
+        username = input_items.get("zenoss_username")
+        zenoss_realm = input_items.get("zenoss_realm")
         no_ssl_cert_check = input_items.get("no_ssl_cert_check")
         cafile = input_items.get("cafile")
         interval = int(input_items.get("interval", HOUR))
@@ -342,6 +397,10 @@ for reference")
         archive_threshold = int(input_items.get("archive_threshold"))
         checkpoint_delete_threshold = int(input_items.get("checkpoint_delete_threshold"))
         tzone = input_items.get("tzone")
+        proxy_uri = input_items.get("proxy_uri")
+        proxy_username = input_items.get("proxy_username")
+        proxy_realm = input_items.get("proxy_realm")
+        proxy_password = None
 
         meta_configs = self._input_definition.metadata
 
@@ -357,10 +416,14 @@ for reference")
         if index_suppressed: params = dict(index_suppressed=True)
         if index_repeats: params = dict(index_repeats=True)
 
-        if tzone:
-            zenoss_tz = pytz.timezone(tzone)
-        else:
-            zenoss_tz = pytz.timezone(str(get_localzone()))
+        try:
+            if tzone:
+                zenoss_tz = pytz.timezone(tzone)
+            else:
+                zenoss_tz = pytz.timezone(str(get_localzone()))
+        except pytz.UnknownTimeZoneError as e:
+            self.logger.warn("Unknown Timezone {} - Using default UTC".format(e))
+            zenoss_tz = pytz.timezone("utc")
             
         # Get UTC timestamp
         utc_now = datetime.utcnow().replace(tzinfo=utc)
@@ -382,6 +445,20 @@ for reference")
             device = input_items.get("device")
         except Exception:
             device = None
+        
+        # Get password from storage password
+        try:
+            password = self.get_password(zenoss_realm, username, meta_configs['session_key'])
+        except Exception as e:
+            self.logger.error("Failed to get password for user %s, realm %s. Verify credential account exists. User who scheduled alert must have Admin privileges. - %s" % (username, zenoss_realm, e))
+            sys.exit(1)
+        
+        if proxy_username is not None:
+            try:
+                proxy_password = self.get_password(proxy_realm, proxy_username, meta_configs['session_key'])
+            except Exception as e:
+                self.logger.error("Failed to get password for user %s, realm %s. Verify credential account exists. User who scheduled alert must have Admin privileges. - %s" % (proxy_username, proxy_realm, e))
+                sys.exit(1)
 
         while True:
             run_from = self.chk.get("run_from")
@@ -395,7 +472,7 @@ for reference")
      
             # Connect to Zenoss web interface and get events
             try:
-                z = ZenossAPI(zenoss_server, username, password, no_ssl_cert_check, cafile)
+                z = ZenossAPI(zenoss_server, username, password, proxy_uri, proxy_username, proxy_password, no_ssl_cert_check, cafile)
             except Exception as e:
                 log_message = "Zenoss Events: Failed to connect to server %s as user %s - Error: %s" % (zenoss_server,
                                                                                                         username,

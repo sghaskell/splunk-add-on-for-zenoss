@@ -245,7 +245,6 @@ function ($,
                             "password": password,
                             "realm": realm};
 
-            console.log(password, confirmPassword);
             if(password != confirmPassword) {
                 return renderModal("password-mismatch",
                                     "Password Mismatch",

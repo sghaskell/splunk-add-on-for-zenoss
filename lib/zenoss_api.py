@@ -10,6 +10,7 @@
 import json
 import urllib
 import requests
+from requests.auth import HTTPProxyAuth
 import re
 
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
@@ -29,16 +30,26 @@ ROUTERS = { 'MessagingRouter': 'messaging',
         'ZenPackRouter': 'zenpack' }
 
 class ZenossAPI():
-    def __init__(self, server, username, password, no_ssl_cert_check=False, cafile=None, debug=False):
+    def __init__(self, server, username, password, proxy_uri=None, proxy_username=None,
+            proxy_password=None, no_ssl_cert_check=False, cafile=None, debug=False):
         self.ZENOSS_INSTANCE = server.rstrip("/")
+        if not self.ZENOSS_INSTANCE.startswith("https://"):
+            raise Exception("URL Scheme for Zenoss Instance must be 'https://'. Got {}".format(server))
         self.ZENOSS_USERNAME = username
         self.ZENOSS_PASSWORD = password
         self.isZenossCloud = re.match(r'^.*\/(cz)\d+.*', self.ZENOSS_INSTANCE)
         self.tid = 1
+        self.auth = None
 
         self.session = requests.Session()
         self.session.verify = no_ssl_cert_check
         self.session.cert = cafile
+        if proxy_uri:
+            proxies = {'http': proxy_uri, 'https': proxy_uri}
+            if proxy_username:
+                # Support Proxy Basic Authentication
+                self.auth = HTTPProxyAuth(proxy_username, proxy_password)
+            self.session.proxies.update(proxies)
 
         # Skip simple auth if Zenoss Cloud URI detected
         if(not self.isZenossCloud):
@@ -54,7 +65,7 @@ class ZenossAPI():
             
             url = "{}/zport/acl_users/cookieAuthHelper/login".format(self.ZENOSS_INSTANCE)
             
-            self.session.post(url, data=data)
+            self.session.post(url, data=data, auth=self.auth)
 
     def _router_request(self, router, method, data=[]):
         if router not in ROUTERS:
@@ -86,7 +97,7 @@ class ZenossAPI():
         self.tid += 1
 
         # Submit the request and convert the returned JSON to objects
-        response = self.session.post(url, headers=header, data=payload)
+        response = self.session.post(url, headers=header, data=payload, auth=self.auth)
 
         # The API returns a 200 response code even whe auth is bad.
         # With bad auth, the login page is displayed. Here I search for
