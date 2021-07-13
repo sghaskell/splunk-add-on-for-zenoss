@@ -1,13 +1,13 @@
 # New in 2.0
 The 2.0 release brings the Zenoss Event custom alert action and the credential management dashboard.
 
-## Upgrading to 2.0.5
+## Upgrading to 2.0.5+
 Since there are major changes to input definition, please make sure to:
 
 * remove your `$SPLUNK_HOME/etc/apps/TA-zenoss/local/inputs.conf` (back it up, eventually)
 * restart Splunk
 
-Version 2.0.5 expects Zenoss credentials to be specified through the [Credential Management Dashboard](#Credential-Management-Dashboard) and does not recognise parameters such as `username` or `password` in `$SPLUNK_HOME/etc/apps/TA-zenoss/local/inputs.conf`. Valid parameters are defined in `$SPLUNK_HOME/etc/apps/TA-zenoss/README/inputs.conf.spec`.
+Version 2.0.5+ expects Zenoss credentials to be specified through the [Credential Management Dashboard](#Credential-Management-Dashboard) and does not recognise parameters such as `username` or `password` in `$SPLUNK_HOME/etc/apps/TA-zenoss/local/inputs.conf`. Valid parameters are defined in `$SPLUNK_HOME/etc/apps/TA-zenoss/README/inputs.conf.spec`.
 
 # Zenoss Compatibility
 This has been tested against and is known to be compatible with Zenoss 4.x and 5.x and Zenoss Cloud with token based authentication.
