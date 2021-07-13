@@ -30,7 +30,7 @@
           <view name="list"/>
           <view name="edit"/>
           <view name="create"/>
-          <key name="exampleText">Zenoss web interface address; e.g. https://zenoss-server:8080</key>
+          <key name="exampleText">Zenoss web interface address; e.g. https://zenoss-domain or https://zenoss-domain/cz0 (for Cloud instances)</key>
         </element>
         <element name="device" type="textfield" label="Device Name">
           <view name="list"/>
@@ -39,7 +39,6 @@
           <key name="exampleText">Optional: Specify a device to pull events from or leave blank for all devices.</key>
         </element>
         <element name="no_ssl_cert_check" type="checkbox" label="Disable SSL Certificate Verification">
-          <view name="list"/>
           <view name="edit"/>
           <view name="create"/>
           <key name="exampleText">Check to disable SSL verification. **WARNING** This is a potentially dangerous option.</key>
