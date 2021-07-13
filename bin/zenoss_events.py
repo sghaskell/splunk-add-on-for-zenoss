@@ -318,7 +318,7 @@ lastTime %s -- skipping" % (evid, last_time)
         username = validation_definition.parameters["zenoss_username"]
         zenoss_realm = validation_definition.parameters["zenoss_realm"]
         zenoss_server = validation_definition.parameters["zenoss_server"]
-        no_ssl_cert_check = int(validation_definition.parameters["no_ssl_cert_check"])
+        no_ssl_cert_check = bool(int(validation_definition.parameters["no_ssl_cert_check"]))
         cafile = validation_definition.parameters["cafile"]
         interval = validation_definition.parameters["interval"]
         start_date = validation_definition.parameters["start_date"]
@@ -385,7 +385,7 @@ for reference")
         zenoss_server = input_items.get("zenoss_server")
         username = input_items.get("zenoss_username")
         zenoss_realm = input_items.get("zenoss_realm")
-        no_ssl_cert_check = input_items.get("no_ssl_cert_check")
+        no_ssl_cert_check = bool(int(input_items.get("no_ssl_cert_check")))
         cafile = input_items.get("cafile")
         interval = int(input_items.get("interval", HOUR))
         start_date = input_items.get("start_date")
