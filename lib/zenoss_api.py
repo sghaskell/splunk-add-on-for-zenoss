@@ -107,7 +107,7 @@ class ZenossAPI():
         if response.status_code != 200:
             raise Exception("Unable to complete request. HTTP Error [{}]: {}".format(
                 response.status_code,
-                payload,
+                response.text,
             ))
 
         return response.json()
