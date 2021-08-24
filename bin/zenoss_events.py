@@ -318,7 +318,9 @@ lastTime %s -- skipping" % (evid, last_time)
         username = validation_definition.parameters["zenoss_username"]
         zenoss_realm = validation_definition.parameters["zenoss_realm"]
         zenoss_server = validation_definition.parameters["zenoss_server"]
-        no_ssl_cert_check = bool(int(validation_definition.parameters["no_ssl_cert_check"]))
+        no_ssl_cert_check = int(validation_definition.parameters["no_ssl_cert_check"])
+        # Since Disable=1 and Enable=0, negate bool() to keep alignment
+        ssl_cert_check = not bool(no_ssl_cert_check)
         cafile = validation_definition.parameters["cafile"]
         interval = validation_definition.parameters["interval"]
         start_date = validation_definition.parameters["start_date"]
@@ -363,11 +365,10 @@ for reference")
 
         # Connect to Zenoss server and get an event to validate connection parameters are correct
         try:
-            z = ZenossAPI(zenoss_server, username, password, proxy_uri, proxy_username, proxy_password, no_ssl_cert_check, cafile)
+            z = ZenossAPI(zenoss_server, username, password, proxy_uri, proxy_username, proxy_password, ssl_cert_check, cafile)
             events = z.get_events(None, start=0, limit=1)
         except Exception as e:
-            raise ValueError("Failed to connect to %s and query for an event - Verify username, password and web \
-# interface address are correct" % zenoss_server)
+            raise ValueError("Failed to connect to {} and query for an event - {}".format(zenoss_server, e))
 
     # Override stream_events method
     # 
@@ -385,7 +386,9 @@ for reference")
         zenoss_server = input_items.get("zenoss_server")
         username = input_items.get("zenoss_username")
         zenoss_realm = input_items.get("zenoss_realm")
-        no_ssl_cert_check = bool(int(input_items.get("no_ssl_cert_check")))
+        no_ssl_cert_check = int(input_items.get("no_ssl_cert_check"))
+        # Since Disable=1 and Enable=0, negate bool() to keep alignment
+        ssl_cert_check = not bool(no_ssl_cert_check)
         cafile = input_items.get("cafile")
         interval = int(input_items.get("interval", HOUR))
         start_date = input_items.get("start_date")
@@ -472,7 +475,7 @@ for reference")
      
             # Connect to Zenoss web interface and get events
             try:
-                z = ZenossAPI(zenoss_server, username, password, proxy_uri, proxy_username, proxy_password, no_ssl_cert_check, cafile)
+                z = ZenossAPI(zenoss_server, username, password, proxy_uri, proxy_username, proxy_password, ssl_cert_check, cafile)
             except Exception as e:
                 log_message = "Zenoss Events: Failed to connect to server %s as user %s - Error: %s" % (zenoss_server,
                                                                                                         username,
