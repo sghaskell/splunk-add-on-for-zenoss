@@ -6,6 +6,8 @@ import splunklib.client as client
 from zenoss_api import ZenossAPI
 
 def get_password(helper, realm, account):
+    helper.log_debug("Retrieving password for account '{}' at realm '{}'".format(account, realm))
+
     try:
         service = client.connect(token=helper.session_key)
         storage_passwords = service.storage_passwords
@@ -74,19 +76,24 @@ def process_event(helper, *args, **kwargs):
     web_address = helper.get_param("web_address")
     credential_account = helper.get_param("credential_account")
     credential_realm = helper.get_param("credential_realm")
-    no_ssl_cert_check = helper.get_param("no_ssl_cert_check")
+    no_ssl_cert_check = int(helper.get_param("no_ssl_cert_check"))
+    # Since Disable=1 and Enable=0, negate bool() to keep alignment
+    ssl_cert_check = not bool(no_ssl_cert_check)
     cafile = helper.get_param("cafile")
 
     proxy_uri = helper.get_param("proxy_uri")
     proxy_credential_account = helper.get_param("proxy_credential_account")
     proxy_credential_realm = helper.get_param("proxy_credential_realm")
+    proxy_password = None
 
     password = get_password(helper, credential_realm, credential_account)
-    proxy_password = get_password(helper, proxy_credential_realm, proxy_credential_account)
+    if proxy_credential_account and proxy_credential_realm:
+        helper.log_info("Proxy with credentials configured")
+        proxy_password = get_password(helper, proxy_credential_realm, proxy_credential_account)
 
     try:
         z = ZenossAPI(web_address, credential_account, password, proxy_uri, 
-            proxy_credential_account, proxy_password, bool(int(no_ssl_cert_check)), cafile)
+            proxy_credential_account, proxy_password, ssl_cert_check, cafile)
     except Exception as e:
         helper.log_error("Failed to connect to zenoss server - %s" % e)
         sys.exit(1)
