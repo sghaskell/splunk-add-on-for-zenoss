@@ -1,15 +1,23 @@
 
 # encoding = utf-8
-import untangle 
 import sys
 import os
-import argparse
-import gzip
-import csv
-from pprint import pprint
-from zenoss_server_config import ZenossServerConfig
+import splunklib.client as client
 from zenoss_api import ZenossAPI
 
+def get_password(helper, realm, account):
+    helper.log_debug("Retrieving password for account '{}' at realm '{}'".format(account, realm))
+
+    try:
+        service = client.connect(token=helper.session_key)
+        storage_passwords = service.storage_passwords
+        returned_credential = [k for k in storage_passwords if k.content.get('realm') == realm and k.content.get('username') == account]
+        if len(returned_credential) < 1:
+            raise Exception("Combination of user and realm not found in storage password")
+        return returned_credential[0].content.get('clear_password')
+    except Exception as e:
+        helper.log_error("Failed to get password for user %s, realm %s. Verify credential account exists. User who scheduled alert must have Admin privileges. - %s" % (account, realm, e))
+        sys.exit(1)
 
 def process_event(helper, *args, **kwargs):
     """
@@ -68,29 +76,25 @@ def process_event(helper, *args, **kwargs):
     web_address = helper.get_param("web_address")
     credential_account = helper.get_param("credential_account")
     credential_realm = helper.get_param("credential_realm")
-    results_file = helper.get_param("results_file")
-    no_ssl_cert_check = helper.get_param("no_ssl_cert_check")
+    no_ssl_cert_check = int(helper.get_param("no_ssl_cert_check"))
+    # Since Disable=1 and Enable=0, negate bool() to keep alignment
+    ssl_cert_check = not bool(no_ssl_cert_check)
     cafile = helper.get_param("cafile")
-    credential_app_context = helper.get_param("credential_app_context")
-    session_key = helper.session_key
-    splunk_server_name = helper.get_param("splunk_server_name")
+
+    proxy_uri = helper.get_param("proxy_uri")
+    proxy_credential_account = helper.get_param("proxy_credential_account")
+    proxy_credential_realm = helper.get_param("proxy_credential_realm")
+    proxy_password = None
+
+    password = get_password(helper, credential_realm, credential_account)
+    if proxy_credential_account and proxy_credential_realm:
+        helper.log_info("Proxy with credentials configured")
+        proxy_password = get_password(helper, proxy_credential_realm, proxy_credential_account)
 
     try:
-        # Get password from REST API
-        res = helper.send_http_request("https://%s:8089/servicesNS/admin/%s/storage/passwords/%s:%s" % (splunk_server_name, credential_app_context, credential_realm, credential_account), "GET", headers={'Authorization': 'Splunk %s' % session_key}, verify=False)
-
-        # Parse clear password
-        user_xml = untangle.parse(res.content)
-        for o in user_xml.feed.entry.content.s_dict.s_key:
-            if(o['name'] == 'clear_password'):
-                password = o.cdata
-    except Exception, e:
-        helper.log_error("Failed to get password for user %s, realm %s. Verify credential account exists. User who scheduled alert must have Admin privileges. - %s" % (credential_account, credential_realm, e))
-        sys.exit(1)
-
-    try:
-        z = ZenossAPI(web_address, credential_account, password, bool(int(no_ssl_cert_check)), cafile)
-    except Exception, e:
+        z = ZenossAPI(web_address, credential_account, password, proxy_uri, 
+            proxy_credential_account, proxy_password, ssl_cert_check, cafile)
+    except Exception as e:
         helper.log_error("Failed to connect to zenoss server - %s" % e)
         sys.exit(1)
 
@@ -99,34 +103,24 @@ def process_event(helper, *args, **kwargs):
     for r in events:
         helper.log_info("event={}".format(r))
     
-        if r.has_key('device'):
+        if "device" in r.keys():
             device = r.get('device')
-        elif r.has_key('host'):
+        elif "host" in r.keys():
             device = r.get('host')
         else:
-            helper.log_error("No host or device specified")
+            helper.log_error("No host or device specified in event")
             sys.exit(1)
 
-        if r.has_key('component'):
-            component = r.get('component')
-        else:
-            component = ''
-
-        if r.has_key('evclass'):
-            evclass = r.get('evclass')
-        else:
-            evclass = ''
-
-        if r.has_key('evclasskey'):
-            evclasskey = r.get('evclasskey')
-        else:
-            evclasskey = ''
-        helper.log_info("%s %s %s" % (device, evclass, component))
+        component = "" if not "component" in r.keys() else r.get("component")
+        evclass = "" if not "evclass" in r.keys() else r.get("evclass")
+        evclass_key = "" if not "evclasskey" in r.keys() else r.get("evclasskey")
+        
+        helper.log_info("{} {} {}".format(device, evclass, component))
+        
         try:
-            z.create_event_on_device(device, r.get('severity'), r.get('summary'), component=component, evclass=evclass, evclasskey=evclasskey)
-        except Exception, e:
-            helper.log_error("Zenoss Create Event: Failed to create event - %s" % e)
-            sys.exit(1)        
+            z.create_event_on_device(device, r.get('severity'), r.get('summary'), component=component, evclass=evclass, evclasskey=evclass_key)
+        except Exception as e:
+            helper.log_error("Zenoss Create Event: Failed to create event - {}".format(e))
+            sys.exit(1)   
     
-    # TODO: Implement your alert action logic here
     return 0
