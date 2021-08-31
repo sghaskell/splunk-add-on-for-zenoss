@@ -1,18 +1,20 @@
+import ta_zenoss_declare
+
 import sys
 import os
-from splunklib.modularinput import *
+import os.path as op
+from splunklib import modularinput as smi
+from splunklib import client as client
+from solnlib import log
+from solnlib.modular_input import checkpointer
 from zenoss_api import ZenossAPI
-from pprint import pprint
 import xml.dom.minidom, xml.sax.saxutils
 import re
 import time
 import json
-import cPickle as pickle
-import gzip
 import pytz
 from datetime import datetime
 from tzlocal import get_localzone
-import time
 import calendar
 
 # Date format for Zenoss API
@@ -28,72 +30,11 @@ LIMIT = 1000
 DAY = 86400
 HOUR = 60
 
-# Checkpoint file class
-# params:
-#  checkpoint_dir - directory where modinput writes checkpoint files
-#  name - name of input to checkpoint
-#  ew - EventWriter object for logging
-class Checkpointer:
-    def __init__(self, checkpoint_dir, name, ew):
-        self.checkpoint_file_name = "%s/%s.pgz" % (checkpoint_dir, name)
-        self.ew = ew
-
-    @property
-    # Method to load checkpoint file
-    def load(self):
-        f = self._open_checkpoint_file("rb")
-        if f is None:
-            return
-
-        try:
-            checkpoint_pickle = pickle.load(f)
-            f.close()
-            return checkpoint_pickle
-        except Exception, e:
-            log_message = "Error reading checkpoint pickle file '%s': %s" % (self.checkpoint_file_name, e)
-            self.ew.write("ERROR", log_message)
-            return {}
-
-    # Method to open checkpoint file
-    def _open_checkpoint_file(self, mode):
-        if not os.path.exists(self.checkpoint_file_name):
-            return None
-        # try to open this file
-        try:
-            f = gzip.open(self.checkpoint_file_name, mode)
-            return f
-        except Exception, e:
-            log_message = "Error opening '%s': %s" % (self.checkpoint_file_name, e)
-            self.ew.log("ERROR", log_message)
-            return None
-
-    # Method to update checkpoint file
-    def update(self, events_dict):
-        tmp_file = "%s.tmp" % self.checkpoint_file_name
-
-        try:
-            f = gzip.open(tmp_file, "wb")
-            pickle.dump(events_dict, f)
-            f.close()
-            os.remove(self.checkpoint_file_name)
-            os.rename(tmp_file, self.checkpoint_file_name)
-        except Exception, e:
-            log_message = "Zenoss Events: Failed to update checkpoint file: %s" % e
-            self.ew.log("ERROR", log_message)
-
-    # Method to clean checkpoint file
-    def clean(self, events_dict, checkpoint_delete_threshold, now_epoch, zenoss_tz):
-        ts_format = "%Y-%m-%d %H:%M:%S"
-        keys = events_dict.keys()
-        for k in keys:
-            if 'last_time' in events_dict[k]:
-                last_time = events_dict[k]['last_time']
-                epoch_delta = self.calc_epoch_delta(last_time, ts_format, now_epoch, zenoss_tz, DAY)
-                if epoch_delta >= int(checkpoint_delete_threshold):
-                    del events_dict[k]
+# App Name
+APP_NAME = __file__.split(op.sep)[-3]
 
 # Inherit Script class from splunklib
-class ZenossModInput(Script):
+class ZenossModInput(smi.Script):
 
     # Get events from JSON api and process
     # Zenoss JSON API only sends 1000 events no matter how
@@ -123,7 +64,7 @@ class ZenossModInput(Script):
                            index_cleared,
                            index_suppressed,
                            archive=False):
-        if(archive):
+        if archive:
             events = z.get_events(device,
                                   start=start,
                                   archive=archive,
@@ -135,9 +76,12 @@ class ZenossModInput(Script):
                                   closed=index_closed,
                                   cleared=index_cleared,
                                   suppressed=index_suppressed)
-        if(events['events']):
+        if events['events']:
             start += LIMIT
-            self.process_events(events, events_dict, ew, params)
+            updated_events_dict = self.process_events(events, events_dict, ew, params)
+            # Updating temporary collection of events data
+            events_dict.update(updated_events_dict)
+
             self.get_and_process_events(z,
                                         events_dict,
                                         ew,
@@ -149,7 +93,7 @@ class ZenossModInput(Script):
                                         index_cleared,
                                         index_suppressed,
                                         archive)
-        return
+        return events_dict
 
     # Write JSON event to stdout and Flush
     # Params:
@@ -157,7 +101,7 @@ class ZenossModInput(Script):
     def write_event(self, e, ew):
         #sys.stdout.write("%s\n" % json.dumps(e))
         #sys.stdout.flush()
-        event = Event(data = json.dumps(e))
+        event = smi.Event(data=json.dumps(e))
         ew.write_event(event)
 
     # Process Zenoss events
@@ -174,18 +118,22 @@ class ZenossModInput(Script):
             event_state = str(e['eventState'])
             event_count = int(e['count'])
 
+            event_data = self.chk.get(evid)
             # Event hasn't been seen; add to checkpoint and index
-            if evid not in events_dict:
+            if event_data is None:
                 # Event not seen yet
                 self.write_event(e, ew)
                 events_dict[evid] = dict(last_time=last_time, event_state=event_state, event_count=event_count)
                 continue 
 
+            # Load data stored in checkpoint for event with given evid
+            event_dict = json.loads(event_data)
+
             # Get last timestamp and state from checkpoint
-            last_event_ts = events_dict[evid]['last_time']
-            last_event_state = events_dict[evid]['event_state']
+            last_event_ts = event_dict['last_time']
+            last_event_state = event_dict['event_state']
             try:
-                last_event_count = events_dict[evid]['event_count']
+                last_event_count = event_dict['event_count']
             except Exception:
                 last_event_count = event_count
 
@@ -212,7 +160,9 @@ class ZenossModInput(Script):
             # Event is unchanged - log info
             log_message = "Zenoss Events: EventID %s present and unchanged since \
 lastTime %s -- skipping" % (evid, last_time)
-            ew.log("INFO", log_message)
+            self.logger.info(log_message)
+
+        return events_dict
 
     # Calculate epoch time delta
     # params:
@@ -225,108 +175,138 @@ lastTime %s -- skipping" % (evid, last_time)
         tstamp_dt = datetime.strptime(tstamp, format)
         tstamp_local = zenoss_tz.localize(tstamp_dt)
         tstamp_epoch = calendar.timegm(tstamp_local.utctimetuple())
-        epoch_delta = round(float(now_epoch - tstamp_epoch)/time_units,2)
-        return(epoch_delta)
+        return round(float(now_epoch - tstamp_epoch)/time_units,2)
+    
+    # Get password from Splunk storage password
+    # params:
+    #   realm - account realm
+    #   account - username given to create an account
+    #   session_key - auth token to access Splunk
+    def get_password(self, realm, account, session_key):
+        service = client.connect(token=session_key)
+        storage_passwords = service.storage_passwords
+        returned_credential = [k for k in storage_passwords if k.content.get('realm') == realm and k.content.get('username') == account]
+        if len(returned_credential) < 1:
+            raise Exception("No match found in storage password. Please verify given user and realm.")
+        return returned_credential[0].content.get('clear_password')
 
     # Override get_scheme method
     # Define Scheme
     # params:
     #  none
     def get_scheme(self):
-        scheme = Scheme("Zenoss Events")
+        scheme = smi.Scheme("Zenoss Events")
         scheme.description = "Modular input to pull events from Zenoss API"
         scheme.use_external_validation = True
         scheme.use_single_instance = False
 
-        username = Argument("username")
-        username.data_type = Argument.data_type_string
-        username.required_on_edit = True
-        username.required_on_create = True
-        scheme.add_argument(username)
+        zenoss_username = smi.Argument("zenoss_username")
+        zenoss_username.data_type = smi.Argument.data_type_string
+        zenoss_username.required_on_edit = True
+        zenoss_username.required_on_create = True
+        scheme.add_argument(zenoss_username)
 
-        password = Argument("password") 
-        password.data_type = Argument.data_type_string
-        password.required_on_edit = True
-        password.required_on_create = True
-        scheme.add_argument(password)
+        zenoss_realm = smi.Argument("zenoss_realm") 
+        zenoss_realm.data_type = smi.Argument.data_type_string
+        zenoss_realm.required_on_edit = False
+        zenoss_realm.required_on_create = False
+        scheme.add_argument(zenoss_realm)
 
-        zenoss_server = Argument("zenoss_server")
-        zenoss_server.data_type = Argument.data_type_string
+        zenoss_server = smi.Argument("zenoss_server")
+        zenoss_server.data_type = smi.Argument.data_type_string
         zenoss_server.required_on_edit = True
         zenoss_server.required_on_create = True
         scheme.add_argument(zenoss_server)
 
-        no_ssl_cert_check = Argument("no_ssl_cert_check")
-        no_ssl_cert_check.data_type = Argument.data_type_boolean
+        no_ssl_cert_check = smi.Argument("no_ssl_cert_check")
+        no_ssl_cert_check.data_type = smi.Argument.data_type_boolean
         no_ssl_cert_check.required_on_edit = True
         no_ssl_cert_check.required_on_create = True
         scheme.add_argument(no_ssl_cert_check)
 
-        cafile = Argument("cafile")
-        cafile.data_type = Argument.data_type_string
+        cafile = smi.Argument("cafile")
+        cafile.data_type = smi.Argument.data_type_string
         cafile.required_on_edit = False
         cafile.required_on_create = False
         scheme.add_argument(cafile)
 
-        device = Argument("device")
-        device.data_type = Argument.data_type_string
+        device = smi.Argument("device")
+        device.data_type = smi.Argument.data_type_string
         device.required_on_edit = False
         device.required_on_create = False
         scheme.add_argument(device)
 
-        tzone = Argument("tzone")
-        tzone.data_type = Argument.data_type_string
+        tzone = smi.Argument("tzone")
+        tzone.data_type = smi.Argument.data_type_string
         tzone.required_on_edit = False
         tzone.required_on_create = False
         scheme.add_argument(tzone)
 
-        start_date = Argument("start_date")
-        start_date.data_type = Argument.data_type_string
+        start_date = smi.Argument("start_date")
+        start_date.data_type = smi.Argument.data_type_string
         start_date.required_on_edit = False
         start_date.required_on_create = False
         scheme.add_argument(start_date)
 
-        index_closed = Argument("index_closed")
-        index_closed.data_type = Argument.data_type_boolean
+        index_closed = smi.Argument("index_closed")
+        index_closed.data_type = smi.Argument.data_type_boolean
         index_closed.required_on_edit = False
         index_closed.required_on_create = False
         scheme.add_argument(index_closed)
 
-        index_cleared = Argument("index_cleared")
-        index_cleared.data_type = Argument.data_type_boolean
+        index_cleared = smi.Argument("index_cleared")
+        index_cleared.data_type = smi.Argument.data_type_boolean
         index_cleared.required_on_edit = False
         index_cleared.required_on_create = False
         scheme.add_argument(index_cleared)
 
-        index_archived = Argument("index_archived")
-        index_archived.data_type = Argument.data_type_boolean
+        index_archived = smi.Argument("index_archived")
+        index_archived.data_type = smi.Argument.data_type_boolean
         index_archived.required_on_edit = False
         index_archived.required_on_create = False
         scheme.add_argument(index_archived)
 
-        index_suppressed = Argument("index_suppressed")
-        index_suppressed.data_type = Argument.data_type_boolean
+        index_suppressed = smi.Argument("index_suppressed")
+        index_suppressed.data_type = smi.Argument.data_type_boolean
         index_suppressed.required_on_edit = False
         index_suppressed.required_on_create = False
         scheme.add_argument(index_suppressed)
 
-        index_repeats = Argument("index_repeats")
-        index_repeats.data_type = Argument.data_type_boolean
+        index_repeats = smi.Argument("index_repeats")
+        index_repeats.data_type = smi.Argument.data_type_boolean
         index_repeats.required_on_edit = False
         index_repeats.required_on_create = False
         scheme.add_argument(index_repeats)
 
-        archive_threshold = Argument("archive_threshold")
-        archive_threshold.data_type = Argument.data_type_string
+        archive_threshold = smi.Argument("archive_threshold")
+        archive_threshold.data_type = smi.Argument.data_type_string
         archive_threshold.required_on_edit = False
         archive_threshold.required_on_create = False
         scheme.add_argument(archive_threshold)
 
-        checkpoint_delete_threshold = Argument("checkpoint_delete_threshold")
-        checkpoint_delete_threshold.data_type = Argument.data_type_string
+        checkpoint_delete_threshold = smi.Argument("checkpoint_delete_threshold")
+        checkpoint_delete_threshold.data_type = smi.Argument.data_type_string
         checkpoint_delete_threshold.required_on_edit = False
         checkpoint_delete_threshold.required_on_create = False
         scheme.add_argument(checkpoint_delete_threshold)
+
+        proxy_uri = smi.Argument("proxy_uri")
+        proxy_uri.data_type = smi.Argument.data_type_string
+        proxy_uri.required_on_edit = False
+        proxy_uri.required_on_create = False
+        scheme.add_argument(proxy_uri)
+
+        proxy_username = smi.Argument("proxy_username")
+        proxy_username.data_type = smi.Argument.data_type_string
+        proxy_username.required_on_edit = False
+        proxy_username.required_on_create = False
+        scheme.add_argument(proxy_username)
+
+        proxy_realm = smi.Argument("proxy_realm")
+        proxy_realm.data_type = smi.Argument.data_type_string
+        proxy_realm.required_on_edit = False
+        proxy_realm.required_on_create = False
+        scheme.add_argument(proxy_realm)
        
         return scheme 
 
@@ -334,14 +314,21 @@ lastTime %s -- skipping" % (evid, last_time)
     # Validate form input
     # params: None
     def validate_input(self, validation_definition):
-        username = validation_definition.parameters["username"]
-        password = validation_definition.parameters["password"]
+        session_key = validation_definition.metadata["session_key"]
+        username = validation_definition.parameters["zenoss_username"]
+        zenoss_realm = validation_definition.parameters["zenoss_realm"]
         zenoss_server = validation_definition.parameters["zenoss_server"]
         no_ssl_cert_check = int(validation_definition.parameters["no_ssl_cert_check"])
+        # Since Disable=1 and Enable=0, negate bool() to keep alignment
+        ssl_cert_check = not bool(no_ssl_cert_check)
         cafile = validation_definition.parameters["cafile"]
         interval = validation_definition.parameters["interval"]
         start_date = validation_definition.parameters["start_date"]
         tz = validation_definition.parameters["tzone"]
+        proxy_uri = validation_definition.parameters["proxy_uri"]
+        proxy_username = validation_definition.parameters["proxy_username"]
+        proxy_realm = validation_definition.parameters["proxy_realm"]
+        proxy_password = None
 
         if int(interval) < 1:
             raise ValueError("Interval value must be a non-zero positive integer")
@@ -358,91 +345,128 @@ example: 2015-03-16T00:00:00')
             raise ValueError("Invalid timezone - See http://en.wikipedia.org/wiki/List_of_tz_database_time_zones \
 for reference")
 
+        if proxy_uri is not None:
+            p = re.compile("^(http|https):\/\/")
+            if not (p.match(proxy_uri)):
+                raise ValueError('Proxy URL does not match the correct format. Please verify URL begins with http:// or https://')
+            
+            if proxy_username is not None:
+                # Proxy Authentication is optional.
+                try:
+                    proxy_password = self.get_password(proxy_realm, proxy_username, session_key)
+                except Exception as e:
+                    raise ValueError("Could not retrieve password for user {} and realm {} - {}".format(proxy_username, proxy_realm, e))
+
+        # Get password from storage password
+        try:
+            password = self.get_password(zenoss_realm, username, session_key)
+        except Exception as e:
+            raise ValueError("Could not retrieve password for user {} and realm {} - {}".format(username, zenoss_realm, e))
+
         # Connect to Zenoss server and get an event to validate connection parameters are correct
         try:
-            z = ZenossAPI(zenoss_server, username, password, no_ssl_cert_check, cafile)
+            z = ZenossAPI(zenoss_server, username, password, proxy_uri, proxy_username, proxy_password, ssl_cert_check, cafile)
             events = z.get_events(None, start=0, limit=1)
-        except:
-            raise ValueError("Failed to connect to %s and query for an event - Verify username, password and web \
-interface address are correct" % zenoss_server)
+        except Exception as e:
+            raise ValueError("Failed to connect to {} and query for an event - {}".format(zenoss_server, e))
 
     # Override stream_events method
     # 
     # Johnny Walker neat, do it... do it!
     def stream_events(self, inputs, ew):
-        instance = inputs.inputs.keys().pop()
-        config = inputs.inputs[instance]
-        input_name = re.sub("^.*?\/\/","", instance) 
-                
+        input_items = {}
+        input_name = list(inputs.inputs.keys())[0]
+        input_items = inputs.inputs[input_name]
+
         # Create UTC timezone for conversion
         utc = pytz.utc
         params = {}
         start = 0
-        #config = get_input_config()
 
-        zenoss_server = config.get("zenoss_server")
-        username = config.get("username")
-        password = config.get("password")
-        no_ssl_cert_check = config.get("no_ssl_cert_check")
-        cafile = config.get("cafile")
-        interval = int(config.get("interval", HOUR))
-        start_date = config.get("start_date")
-        index_closed = int(config.get("index_closed"))
-        index_cleared = int(config.get("index_cleared"))
-        index_archived = int(config.get("index_archived"))
-        index_suppressed = int(config.get("index_suppressed"))
-        index_repeats = int(config.get("index_repeats"))
-        archive_threshold = int(config.get("archive_threshold"))
-        checkpoint_delete_threshold = int(config.get("checkpoint_delete_threshold"))
-        tzone = config.get("tzone")
+        zenoss_server = input_items.get("zenoss_server")
+        username = input_items.get("zenoss_username")
+        zenoss_realm = input_items.get("zenoss_realm")
+        no_ssl_cert_check = int(input_items.get("no_ssl_cert_check"))
+        # Since Disable=1 and Enable=0, negate bool() to keep alignment
+        ssl_cert_check = not bool(no_ssl_cert_check)
+        cafile = input_items.get("cafile")
+        interval = int(input_items.get("interval", HOUR))
+        start_date = input_items.get("start_date")
+        index_closed = int(input_items.get("index_closed"))
+        index_cleared = int(input_items.get("index_cleared"))
+        index_archived = int(input_items.get("index_archived"))
+        index_suppressed = int(input_items.get("index_suppressed"))
+        index_repeats = int(input_items.get("index_repeats"))
+        archive_threshold = int(input_items.get("archive_threshold"))
+        checkpoint_delete_threshold = int(input_items.get("checkpoint_delete_threshold"))
+        tzone = input_items.get("tzone")
+        proxy_uri = input_items.get("proxy_uri")
+        proxy_username = input_items.get("proxy_username")
+        proxy_realm = input_items.get("proxy_realm")
+        proxy_password = None
+
+        meta_configs = self._input_definition.metadata
+
+        # Generate logger with input name
+        _, input_name = (input_name.split('//', 2))
+        self.logger = log.Logs().get_logger('{}_input'.format(APP_NAME))
+
+        # Log level configuration
+        self.logger.setLevel('INFO')
 
         if index_closed: params = dict(index_closed=True)
         if index_cleared: params = dict(index_closed=True)
         if index_suppressed: params = dict(index_suppressed=True)
         if index_repeats: params = dict(index_repeats=True)
 
-        if tzone:
-            zenoss_tz = pytz.timezone(tzone)
-        else:
-            zenoss_tz = pytz.timezone(str(get_localzone()))
+        try:
+            if tzone:
+                zenoss_tz = pytz.timezone(tzone)
+            else:
+                zenoss_tz = pytz.timezone(str(get_localzone()))
+        except pytz.UnknownTimeZoneError as e:
+            self.logger.warn("Unknown Timezone {} - Using default UTC".format(e))
+            zenoss_tz = pytz.timezone("utc")
             
+        # Get UTC timestamp
+        utc_now = datetime.utcnow().replace(tzinfo=utc)
+        # Convert to Zenoss server timezone
+        now_local = utc_now.astimezone(zenoss_tz)
+        # Create local time string
+        now_str = now_local.strftime(DATE_FORMAT)
 
         # Load checkpoint file
-        chk = Checkpointer(str(inputs.metadata.get("checkpoint_dir")), str(input_name), ew)
-        events_dict = chk.load
+        self.chk = checkpointer.FileCheckpointer(meta_configs['checkpoint_dir'])
 
-        if not events_dict:
-            # Get UTC timestamp
-            utc_now = datetime.utcnow().replace(tzinfo=utc)
-            # Convert to Zenoss server timezone
-            now_local = utc_now.astimezone(zenoss_tz)
-            # Create local time string
-            now_str = now_local.strftime(DATE_FORMAT)
-            
-            if start_date:
-                events_dict = dict(run_from=start_date, last_run=None, last_cleaned=now_str)
-            else:
-                events_dict = dict(run_from=None, last_run=None, last_cleaned=now_str)
-            # Create checkpoint file
-            try:
-                gzip.open(chk.checkpoint_file_name, 'wb').close()
-                chk.update(events_dict)
-            except Exception, e:
-                log_message = "Zenoss Events: Failed to create checkpoint file %s - Error: %s" % (chk.checkpoint_file_name, e)
-                ew.log("ERROR", log_message)
+        if self.chk.get("run_from") is None:
+            # Initializing keys in checkpoint
+            self.chk.update("run_from", start_date)
+            self.chk.update("last_run", None)
+            self.chk.update("last_cleaned", now_str)
+
         try:
-            device = config.get("device")
+            device = input_items.get("device")
         except Exception:
             device = None
+        
+        # Get password from storage password
+        try:
+            password = self.get_password(zenoss_realm, username, meta_configs['session_key'])
+        except Exception as e:
+            self.logger.error("Failed to get password for user %s, realm %s. Verify credential account exists. User who scheduled alert must have Admin privileges. - %s" % (username, zenoss_realm, e))
+            sys.exit(1)
+        
+        if proxy_username is not None:
+            try:
+                proxy_password = self.get_password(proxy_realm, proxy_username, meta_configs['session_key'])
+            except Exception as e:
+                self.logger.error("Failed to get password for user %s, realm %s. Verify credential account exists. User who scheduled alert must have Admin privileges. - %s" % (proxy_username, proxy_realm, e))
+                sys.exit(1)
 
         while True:
-            # Load checkpoint file
-            chk = Checkpointer(str(inputs.metadata.get("checkpoint_dir")), str(input_name), ew)
-            events_dict = chk.load
-            run_from = events_dict.get("run_from")
+            run_from = self.chk.get("run_from")
+            # When none --> get ALL events, otherwise from users' specified date
 
-            if not run_from: run_from = start_date
-       
             # Work with datetimes in UTC and then convert to timezone of Zenoss server 
             utc_dt = utc.localize(datetime.utcnow())
             now_local = zenoss_tz.normalize(utc_dt.astimezone(zenoss_tz))
@@ -451,16 +475,23 @@ interface address are correct" % zenoss_server)
      
             # Connect to Zenoss web interface and get events
             try:
-                z = ZenossAPI(zenoss_server, username, password, no_ssl_cert_check, cafile)
-            except Exception, e:
+                z = ZenossAPI(zenoss_server, username, password, proxy_uri, proxy_username, proxy_password, ssl_cert_check, cafile)
+            except Exception as e:
                 log_message = "Zenoss Events: Failed to connect to server %s as user %s - Error: %s" % (zenoss_server,
                                                                                                         username,
                                                                                                         e)
-                ew.log("ERROR", log_message)
+                self.logger.error("{}. Exiting.".format(log_message))
                 sys.exit(1)
 
+            # Initializing data
+            events_dict = {
+                "run_from": self.chk.get("run_from"),
+                "last_run": self.chk.get("last_run"),
+                "last_cleaned": self.chk.get("last_cleaned")
+            }
+
             # Get Events
-            self.get_and_process_events(z,
+            events_dict = self.get_and_process_events(z,
                                         events_dict,
                                         ew,
                                         params,
@@ -478,7 +509,10 @@ interface address are correct" % zenoss_server)
             if index_archived:
                 # Get last archive read, convert and create epoch timestamp
                 try:
-                    last_archive_read = events_dict['last_archive_read']
+                    last_archive_read = self.chk.get('last_archive_read')
+                    if last_archive_read is None:
+                        # Key does not exist in checkpoint
+                        raise Exception
                     archive_delta = self.calc_epoch_delta(last_archive_read, DATE_FORMAT, now_epoch, zenoss_tz, HOUR)
                 except Exception:
                     last_archive_read = None
@@ -489,7 +523,7 @@ interface address are correct" % zenoss_server)
                 if archive_delta >= archive_threshold or \
                    not last_archive_read:
                     log_message = "Zenoss Events: Processing Archived Events\n" % params
-                    ew.log("INFO", log_message)
+                    self.logger.info(log_message)
                     self.get_and_process_events(z,
                                         events_dict,
                                         ew,
@@ -506,21 +540,39 @@ interface address are correct" % zenoss_server)
             # Clean checkpoint file
             try:
                 last_cleaned = events_dict['last_cleaned']
+                if last_cleaned is None:
+                    # Key does not exist in checkpoint
+                    raise Exception
             except Exception:
                 last_cleaned = cur_time
 
             # Check to see if we need to clean the checkpoint file based on the 
             # checkpoint delta threshold
             last_cleaned_delta = self.calc_epoch_delta(last_cleaned, DATE_FORMAT, now_epoch, zenoss_tz, DAY)
+            keys_toclean = []
 
             # Clean checkpoint file of old archive records
             if last_cleaned_delta >= CHECKPOINT_CLEAN_FREQUENCY:
-                chk.clean(events_dict, checkpoint_delete_threshold, now_epoch, zenoss_tz)
+                for k in events_dict.keys():
+                    if isinstance(events_dict[k], dict) and 'last_time' in events_dict[k]:
+                        last_time = events_dict[k]['last_time']
+                        epoch_delta = self.calc_epoch_delta(last_time, "%Y-%m-%d %H:%M:%S", now_epoch, zenoss_tz, DAY)
+                        if epoch_delta >= int(checkpoint_delete_threshold):
+                            keys_toclean.append(k)
+                            self.chk.delete(k)
 
             # Update checkpoint file
-            chk.update(events_dict)
+            for key in events_dict.keys():
+                if key in keys_toclean:
+                    continue
+                # dict2str to save among checkpoints
+                value = events_dict[key]
+                if isinstance(value, dict):
+                    value = json.dumps(value)
+                self.chk.update(key, value)
 
             time.sleep(float(interval)) 
 
 if __name__ == '__main__':
-    sys.exit(ZenossModInput().run(sys.argv))    
+    exit_code = ZenossModInput().run(sys.argv)
+    sys.exit(exit_code)
