@@ -150,8 +150,10 @@ require(['jquery',
             }
         });
 
-        //Give time to load the table or onclick will not apply to Action buttons
-        setTimeout(pollAvailability, 600);
+        //Give time to load the table (if there's one) or onclick will not apply to Action buttons
+        if ($("#resttable td").length > 0) {
+            setTimeout(pollAvailability, 600);
+        }
 
         //Add custom view rendering
         var CustomActionsRenderer = TableView.BaseCellRenderer.extend({
