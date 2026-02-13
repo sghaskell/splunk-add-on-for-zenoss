@@ -44,5 +44,5 @@ class AlertActionWorkerZenoss_Event(ModularAlertBase):
         return status
 
 if __name__ == "__main__":
-    exitcode = AlertActionWorkerZenoss_Event("TA-zenoss", "zenoss_event").run(sys.argv)
+    exitcode = AlertActionWorkerZenoss_Event("TA-zenoss-fdse", "zenoss_event").run(sys.argv)
     sys.exit(exitcode)

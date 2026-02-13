@@ -1,23 +1,35 @@
-
 # encoding = utf-8
 import sys
 import os
 import splunklib.client as client
 from zenoss_api import ZenossAPI
 
+
 def get_password(helper, realm, account):
-    helper.log_debug("Retrieving password for account '{}' at realm '{}'".format(account, realm))
+    helper.log_debug(
+        "Retrieving password for account '{}' at realm '{}'".format(account, realm)
+    )
 
     try:
         service = client.connect(token=helper.session_key)
         storage_passwords = service.storage_passwords
-        returned_credential = [k for k in storage_passwords if k.content.get('realm') == realm and k.content.get('username') == account]
+        returned_credential = [
+            k
+            for k in storage_passwords
+            if k.content.get("realm") == realm and k.content.get("username") == account
+        ]
         if len(returned_credential) < 1:
-            raise Exception("Combination of user and realm not found in storage password")
-        return returned_credential[0].content.get('clear_password')
+            raise Exception(
+                "Combination of user and realm not found in storage password"
+            )
+        return returned_credential[0].content.get("clear_password")
     except Exception as e:
-        helper.log_error("Failed to get password for user %s, realm %s. Verify credential account exists. User who scheduled alert must have Admin privileges. - %s" % (account, realm, e))
+        helper.log_error(
+            "Failed to get password for user %s, realm %s. Verify credential account exists. User who scheduled alert must have Admin privileges. - %s"
+            % (account, realm, e)
+        )
         sys.exit(1)
+
 
 def process_event(helper, *args, **kwargs):
     """
@@ -89,11 +101,21 @@ def process_event(helper, *args, **kwargs):
     password = get_password(helper, credential_realm, credential_account)
     if proxy_credential_account and proxy_credential_realm:
         helper.log_info("Proxy with credentials configured")
-        proxy_password = get_password(helper, proxy_credential_realm, proxy_credential_account)
+        proxy_password = get_password(
+            helper, proxy_credential_realm, proxy_credential_account
+        )
 
     try:
-        z = ZenossAPI(web_address, credential_account, password, proxy_uri, 
-            proxy_credential_account, proxy_password, ssl_cert_check, cafile)
+        z = ZenossAPI(
+            web_address,
+            credential_account,
+            password,
+            proxy_uri,
+            proxy_credential_account,
+            proxy_password,
+            ssl_cert_check,
+            cafile,
+        )
     except Exception as e:
         helper.log_error("Failed to connect to zenoss server - %s" % e)
         sys.exit(1)
@@ -102,11 +124,11 @@ def process_event(helper, *args, **kwargs):
 
     for r in events:
         helper.log_info("event={}".format(r))
-    
+
         if "device" in r.keys():
-            device = r.get('device')
+            device = r.get("device")
         elif "host" in r.keys():
-            device = r.get('host')
+            device = r.get("host")
         else:
             helper.log_error("No host or device specified in event")
             sys.exit(1)
@@ -114,13 +136,22 @@ def process_event(helper, *args, **kwargs):
         component = "" if not "component" in r.keys() else r.get("component")
         evclass = "" if not "evclass" in r.keys() else r.get("evclass")
         evclass_key = "" if not "evclasskey" in r.keys() else r.get("evclasskey")
-        
+
         helper.log_info("{} {} {}".format(device, evclass, component))
-        
+
         try:
-            z.create_event_on_device(device, r.get('severity'), r.get('summary'), component=component, evclass=evclass, evclasskey=evclass_key)
+            z.create_event_on_device(
+                device,
+                r.get("severity"),
+                r.get("summary"),
+                component=component,
+                evclass=evclass,
+                evclasskey=evclass_key,
+            )
         except Exception as e:
-            helper.log_error("Zenoss Create Event: Failed to create event - {}".format(e))
-            sys.exit(1)   
-    
+            helper.log_error(
+                "Zenoss Create Event: Failed to create event - {}".format(e)
+            )
+            sys.exit(1)
+
     return 0
