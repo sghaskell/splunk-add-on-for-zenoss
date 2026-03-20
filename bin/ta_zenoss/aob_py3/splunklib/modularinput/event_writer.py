@@ -1,4 +1,4 @@
-# Copyright 2011-2015 Splunk, Inc.
+# Copyright © 2011-2024 Splunk, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"): you may
 # not use this file except in compliance with the License. You may obtain
@@ -12,19 +12,14 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-from __future__ import absolute_import
 import sys
+import traceback
 
-from io import TextIOWrapper, TextIOBase
-from splunklib.six import ensure_text
+from ..utils import ensure_str
 from .event import ET
 
-try:
-    from splunklib.six.moves import cStringIO as StringIO
-except ImportError:
-    from splunklib.six import StringIO
 
-class EventWriter(object):
+class EventWriter:
     """``EventWriter`` writes events and error messages to Splunk from a modular input.
     Its two important methods are ``writeEvent``, which takes an ``Event`` object,
     and ``log``, which takes a severity and an error message.
@@ -38,20 +33,13 @@ class EventWriter(object):
     ERROR = "ERROR"
     FATAL = "FATAL"
 
-    def __init__(self, output = sys.stdout, error = sys.stderr):
+    def __init__(self, output=sys.stdout, error=sys.stderr):
         """
         :param output: Where to write the output; defaults to sys.stdout.
         :param error: Where to write any errors; defaults to sys.stderr.
         """
-        if isinstance(output, TextIOBase):
-            self._out = output
-        else:
-            self._out = TextIOWrapper(output)
-
-        if isinstance(error, TextIOBase):
-            self._err = error
-        else:
-            self._err = TextIOWrapper(error)
+        self._out = output
+        self._err = error
 
         # has the opening <stream> tag been written yet?
         self.header_written = False
@@ -63,7 +51,7 @@ class EventWriter(object):
         """
 
         if not self.header_written:
-            self._out.write(ensure_text("<stream>"))
+            self._out.write("<stream>")
             self.header_written = True
 
         event.write_to(self._out)
@@ -71,10 +59,33 @@ class EventWriter(object):
     def log(self, severity, message):
         """Logs messages about the state of this modular input to Splunk.
         These messages will show up in Splunk's internal logs.
+
         :param severity: ``string``, severity of message, see severities defined as class constants.
         :param message: ``string``, message to log.
         """
-        self._err.write(ensure_text("%s %s\n" % (severity, message)))
+
+        self._err.write(f"{severity} {message}\n")
+        self._err.flush()
+
+    def log_exception(self, message, exception=None, severity=None):
+        """Logs messages about the exception thrown by this modular input to Splunk.
+        These messages will show up in Splunk's internal logs.
+
+        :param message: ``string``, message to log.
+        :param exception: ``Exception``, exception thrown by this modular input; if none, sys.exc_info() is used
+        :param severity: ``string``, severity of message, see severities defined as class constants. Default severity: ERROR
+        """
+        if exception is not None:
+            tb_str = traceback.format_exception(
+                type(exception), exception, exception.__traceback__
+            )
+        else:
+            tb_str = traceback.format_exc()
+
+        if severity is None:
+            severity = EventWriter.ERROR
+
+        self._err.write(("%s %s - %s" % (severity, message, tb_str)).replace("\n", " "))
         self._err.flush()
 
     def write_xml_document(self, document):
@@ -83,11 +94,11 @@ class EventWriter(object):
 
         :param document: An ``ElementTree`` object.
         """
-        data = ET.tostring(document)
-        self._out.write(ensure_text(data))
+        self._out.write(ensure_str(ET.tostring(document), errors="replace"))
         self._out.flush()
 
     def close(self):
         """Write the closing </stream> tag to make this XML well formed."""
-        self._out.write(ensure_text("</stream>"))
+        if self.header_written:
+            self._out.write("</stream>")
         self._out.flush()
