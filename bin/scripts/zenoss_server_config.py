@@ -4,8 +4,8 @@ from cfgparse import ConfigParser
 import base64
 import cPickle as pickle
 
-APPS_DIR = "etc/apps/TA-zenoss-fdse"
-BIN_DIR = "etc/apps/TA-zenoss-fdse/bin"
+APPS_DIR = "etc/apps/TA-zenoss"
+BIN_DIR = "etc/apps/TA-zenoss/bin"
 ZENOSS_SERVER_CONFIG = "local/zenoss_servers.conf"
 HASH_CHK_FILE = ".server_config_hash"
 
