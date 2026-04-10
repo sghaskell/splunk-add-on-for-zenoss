@@ -84,7 +84,7 @@ class ZenossServerConfig:
             self.web_address = c.add_option('web_address', keys = self.stanza).get()
             self.no_ssl_cert_check = c.add_option('no_ssl_cert_check', keys = self.stanza).get()
             self.cafile = c.add_option('cafile', keys = self.stanza).get()
-        except Exception, e:
+        except Exception as e:
             sys.stderr.write("Faled to parse config - %s\n" % e)
             sys.exit(1)
 
@@ -97,7 +97,7 @@ class ZenossServerConfig:
             pw_hash = base64.b64encode(self.password)
         try:
             f = open(self.config_path, 'w+')
-        except Exception, e:
+        except Exception as e:
             sys.stderr.write("%s" % e)
             sys.exit(1)
 
