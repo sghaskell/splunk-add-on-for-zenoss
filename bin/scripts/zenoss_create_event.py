@@ -47,7 +47,7 @@ def main():
     
     try:
         z = ZenossAPI(config.web_address, config.username, config.password, int(config.no_ssl_cert_check), config.cafile)
-    except Exception, e:
+    except Exception as e:
         logging.error("Zenoss Create Event: Failed to connect to zenoss server - %s" % e)
 
     with gzip.open(flags.file, 'rb') as csvfile:
@@ -78,7 +78,7 @@ def main():
                 
             try:
                 z.create_event_on_device(device, r.get('severity'), r.get('summary'), component=component, evclass=evclass, evclasskey=evclasskey)
-            except Exception, e:
+            except Exception as e:
                 logging.error("Zenoss Create Event: Failed to create event - %s" % e)
                 sys.exit(1)
 

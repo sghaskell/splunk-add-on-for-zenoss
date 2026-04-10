@@ -1,45 +1,81 @@
+#
+# Copyright 2025 Splunk Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
 """
 REST Handler.
 """
 
-from __future__ import absolute_import
 
-from future import standard_library
-standard_library.install_aliases()
-from builtins import object
 import json
 import traceback
-from urllib.parse import urlparse
+import urllib.parse
+from typing import Optional, Any
 
+from defusedxml import ElementTree
 from functools import wraps
-from solnlib.packages.splunklib import binding
+
 from solnlib.splunk_rest_client import SplunkRestClient
+from solnlib.utils import is_true
+from splunklib import binding
 
-from .error import RestError
-from .entity import RestEntity
 from .credentials import RestCredentials
+from .entity import RestEntity
+from .error import RestError
 
+__all__ = ["RestHandler"]
 
-__all__ = ['RestHandler']
+BASIC_NAME_VALIDATORS = {
+    "PROHIBITED_NAME_CHARACTERS": ["*", "\\", "[", "]", "(", ")", "?", ":"],
+    "PROHIBITED_NAMES": ["default", ".", ".."],
+    "MAX_LENGTH": 1024,
+}
+
+_TA_CONFIG_FILENAME = "_TA_config"
+_TA_CONFIG_ENDPOINT = f"configs/conf-{_TA_CONFIG_FILENAME}"
+_NEED_RELOAD_PARAMETER = "need_reload"
 
 
 def _check_name_for_create(name):
-    if name == 'default':
-        raise RestError(
-            400,
-            '"%s" is not allowed for entity name' % name
-        )
+    if name == "default":
+        raise RestError(400, '"%s" is not allowed for entity name' % name)
     if name.startswith("_"):
-        raise RestError(
-            400,
-            'Name starting with "_" is not allowed for entity'
-        )
+        raise RestError(400, 'Name starting with "_" is not allowed for entity')
+
+
+def _parse_error_msg(exc: binding.HTTPError) -> str:
+    permission_msg = "do not have permission to perform this operation"
+    try:
+        msgs = json.loads(exc.body)["messages"]
+        text = msgs[0]["text"]
+    except json.JSONDecodeError:
+        try:
+            text = ElementTree.fromstring(exc.body).findtext("./messages/msg")
+        except ElementTree.ParseError:
+            return exc.body.decode()
+    except (KeyError, IndexError):
+        return exc.body.decode()
+    if exc.status == 403 and permission_msg in text:
+        return "This operation is forbidden."
+    return text
 
 
 def _pre_request(existing):
     """
     Encode payload before request.
-    :param existing: 
+    :param existing:
         if True: means must exist
         if False: means must NOT exist
     :return:
@@ -51,6 +87,7 @@ def _pre_request(existing):
         :param meth: RestHandler instance method
         :return:
         """
+
         def check_existing(self, name):
             if not existing:
                 # for create, check name
@@ -78,6 +115,29 @@ def _pre_request(existing):
             else:
                 return None
 
+        def basic_name_validation(name: str):
+            tmp_name = str(name)
+            prohibited_chars = BASIC_NAME_VALIDATORS["PROHIBITED_NAME_CHARACTERS"]
+            prohibited_names = BASIC_NAME_VALIDATORS["PROHIBITED_NAMES"]
+            max_chars = BASIC_NAME_VALIDATORS["MAX_LENGTH"]
+            val_err_msg = (
+                f'{prohibited_names}, string started with "_" and string including any one '
+                f'of {prohibited_chars} are reserved value which cannot be used for field Name"'
+            )
+
+            if tmp_name.startswith("_") or any(
+                tmp_name == el for el in prohibited_names
+            ):
+                raise RestError(400, val_err_msg)
+
+            if any(pc in prohibited_chars for pc in tmp_name):
+                raise RestError(400, val_err_msg)
+
+            if len(tmp_name) >= max_chars:
+                raise RestError(
+                    400, f"Field Name must be less than {max_chars} characters"
+                )
+
         @wraps(meth)
         def wrapper(self, name, data):
             self._endpoint.validate(
@@ -85,6 +145,8 @@ def _pre_request(existing):
                 data,
                 check_existing(self, name),
             )
+            basic_name_validation(name)
+            self._endpoint.validate_special(name, data)
             self._endpoint.encode(name, data)
 
             return meth(self, name, data)
@@ -100,12 +162,13 @@ def _decode_response(meth):
     :param meth: RestHandler instance method
     :return:
     """
+
     def decode(self, name, data, acl):
         self._endpoint.decode(name, data)
         return RestEntity(
             name,
             data,
-            self._endpoint.model(name, data),
+            self._endpoint.model(name),
             self._endpoint.user,
             self._endpoint.app,
             acl=acl,
@@ -119,29 +182,23 @@ def _decode_response(meth):
         except RestError:
             raise
         except binding.HTTPError as exc:
-            raise RestError(exc.status, str(exc))
+            raise RestError(exc.status, _parse_error_msg(exc))
         except Exception:
             raise RestError(500, traceback.format_exc())
 
     return wrapper
 
 
-class RestHandler(object):
-    def __init__(
-            self,
-            splunkd_uri,
-            session_key,
-            endpoint,
-            *args,
-            **kwargs
-    ):
+class RestHandler:
+    def __init__(self, splunkd_uri, session_key, endpoint, *args, **kwargs):
         self._splunkd_uri = splunkd_uri
         self._session_key = session_key
         self._endpoint = endpoint
         self._args = args
         self._kwargs = kwargs
+        self._conf_name = getattr(endpoint, "conf_name", None)
 
-        splunkd_info = urlparse(self._splunkd_uri)
+        splunkd_info = urllib.parse.urlparse(self._splunkd_uri)
         self._client = SplunkRestClient(
             self._session_key,
             self._endpoint.app,
@@ -154,44 +211,42 @@ class RestHandler(object):
             self._session_key,
             self._endpoint,
         )
-        self.PASSWORD = u'********'
+        self.PASSWORD = "******"
 
     @_decode_response
     def get(self, name, decrypt=False):
-        if self._endpoint.need_reload:
-            self.reload()
+        self.reload_if_needed()
         response = self._client.get(
             self.path_segment(
                 self._endpoint.internal_endpoint,
                 name=name,
             ),
-            output_mode='json',
+            output_mode="json",
         )
         return self._format_response(response, get=True, decrypt=decrypt)
 
     @_decode_response
     def all(self, decrypt=False, **query):
-        if self._endpoint.need_reload:
-            self.reload()
+        self.reload_if_needed()
         response = self._client.get(
             self.path_segment(self._endpoint.internal_endpoint),
-            output_mode='json',
-            **query
+            output_mode="json",
+            **query,
         )
         return self._format_all_response(response, decrypt)
 
-    def get_encrypted_field_names(self, name, data):
-        return [x.name for x in self._endpoint.model(name, data).fields if x.encrypted]
+    def get_encrypted_field_names(self, name):
+        return [x.name for x in self._endpoint.model(name).fields if x.encrypted]
 
     @_decode_response
     @_pre_request(existing=False)
     def create(self, name, data):
-        data['name'] = name
+        data["name"] = name
         self.rest_credentials.encrypt_for_create(name, data)
         response = self._client.post(
             self.path_segment(self._endpoint.internal_endpoint),
-            output_mode='json',
-            body=data
+            output_mode="json",
+            body=data,
         )
         return self._format_response(response)
 
@@ -204,8 +259,8 @@ class RestHandler(object):
                 self._endpoint.internal_endpoint,
                 name=name,
             ),
-            output_mode='json',
-            body=data
+            output_mode="json",
+            body=data,
         )
         return self._format_response(response)
 
@@ -216,16 +271,16 @@ class RestHandler(object):
                 self._endpoint.internal_endpoint,
                 name=name,
             ),
-            output_mode='json',
+            output_mode="json",
         )
-
-        # delete credentials
-        rest_credentials = RestCredentials(
-            self._splunkd_uri,
-            self._session_key,
-            self._endpoint,
-        )
-        rest_credentials.delete(name)
+        # delete credentials if there are encrypted fields
+        if self.get_encrypted_field_names(name):
+            rest_credentials = RestCredentials(
+                self._splunkd_uri,
+                self._session_key,
+                self._endpoint,
+            )
+            rest_credentials.delete(name)
         return self._flay_response(response)
 
     @_decode_response
@@ -234,9 +289,9 @@ class RestHandler(object):
             self.path_segment(
                 self._endpoint.internal_endpoint,
                 name=name,
-                action='disable',
+                action="disable",
             ),
-            output_mode='json',
+            output_mode="json",
         )
         return self._flay_response(response)
 
@@ -246,19 +301,59 @@ class RestHandler(object):
             self.path_segment(
                 self._endpoint.internal_endpoint,
                 name=name,
-                action='enable',
+                action="enable",
             ),
-            output_mode='json',
+            output_mode="json",
         )
         return self._flay_response(response)
+
+    def reload_if_needed(self):
+        if self._conf_name and self.is_reload_needed():
+            self.reload()
+
+    def is_reload_needed(self) -> bool:
+        need_reload = self._is_reload_needed()
+
+        if need_reload is None:
+            need_reload = self._endpoint.need_reload
+
+        return need_reload
+
+    def _is_reload_needed(self) -> Optional[bool]:
+        name = "config"
+        try:
+            response = self._client.get(
+                self.path_segment(
+                    _TA_CONFIG_ENDPOINT,
+                    name=name,
+                ),
+                output_mode="json",
+            )
+        except binding.HTTPError:
+            return None
+
+        response = json.loads(response.body.read())
+
+        if "entry" in response:
+            for entry in response["entry"]:
+                if entry["name"] == name and _NEED_RELOAD_PARAMETER in entry["content"]:
+                    need_reload = is_true(entry["content"][_NEED_RELOAD_PARAMETER])
+
+                    if need_reload is not None:
+                        return need_reload
+
+        return None
 
     def reload(self):
         self._client.get(
             self.path_segment(
                 self._endpoint.internal_endpoint,
-                action='_reload',
+                action="_reload",
             ),
         )
+
+    def get_endpoint(self):
+        return self._endpoint
 
     @classmethod
     def path_segment(cls, endpoint, name=None, action=None):
@@ -271,33 +366,30 @@ class RestHandler(object):
         :param action: Splunk REST action, e.g. disable, enable
         :return:
         """
-        template = '{endpoint}{entity}{action}'
-        entity = ''
+        template = "{endpoint}{entity}{action}"
+        entity = ""
         if name:
             # all special characters except "/" will be
             # url-encoded in splunklib.binding.UrlEncoded
-            entity = '/' + name.replace('/', '%2F')
+            entity = "/" + name.replace("/", "%2F")
         path = template.format(
-            endpoint=endpoint.strip('/'),
+            endpoint=endpoint.strip("/"),
             entity=entity,
-            action='/%s' % action if action else '',
+            action="/%s" % action if action else "",
         )
-        return path.strip('/')
+        return path.strip("/")
 
     def _format_response(self, response, get=False, decrypt=False):
         body = response.body.read()
         try:
             cont = json.loads(body)
         except ValueError:
-            raise RestError(
-                500,
-                'Fail to load response, invalid JSON'
-            )
-        for entry in cont['entry']:
-            name = entry['name']
-            data = entry['content']
-            acl = entry['acl']
-            encrypted_field_names = self.get_encrypted_field_names(name, data)
+            raise RestError(500, "Fail to load response, invalid JSON")
+        for entry in cont["entry"]:
+            name = entry["name"]
+            data = entry["content"]
+            acl = entry["acl"]
+            encrypted_field_names = self.get_encrypted_field_names(name)
             # encrypt and get clear password for get request
             if get:
                 masked = self.rest_credentials.decrypt_for_get(name, data)
@@ -307,11 +399,11 @@ class RestHandler(object):
                             self._endpoint.internal_endpoint,
                             name=name,
                         ),
-                        body=masked
+                        body=masked,
                     )
 
             if not decrypt:
-                # replace clear password with '********'
+                # replace clear password with '******'
                 for field_name in encrypted_field_names:
                     if field_name in data and data[field_name]:
                         data[field_name] = self.PASSWORD
@@ -323,14 +415,11 @@ class RestHandler(object):
         try:
             cont = json.loads(body)
         except ValueError:
-            raise RestError(
-                500,
-                'Fail to load response, invalid JSON'
-            )
-        for entry in cont['entry']:
-            name = entry['name']
-            data = entry['content']
-            acl = entry['acl']
+            raise RestError(500, "Fail to load response, invalid JSON")
+        for entry in cont["entry"]:
+            name = entry["name"]
+            data = entry["content"]
+            acl = entry["acl"]
             if self._need_decrypt(name, data, decrypt):
                 self._load_credentials(name, data)
             if not decrypt:
@@ -342,28 +431,22 @@ class RestHandler(object):
         try:
             cont = json.loads(body)
         except ValueError:
-            raise RestError(
-                500,
-                'Fail to load response, invalid JSON'
-            )
+            raise RestError(500, "Fail to load response, invalid JSON")
         # cont['entry']: collection list, load credentials in one request
-        # if any(x.encrypted for x in self._endpoint.model(None, cont['entry']).fields):
-        if self.get_encrypted_field_names(None, cont['entry']):
-            self._encrypt_raw_credentials(cont['entry'])
+        if self.get_encrypted_field_names(None):
+            self._encrypt_raw_credentials(cont["entry"])
         if not decrypt:
-            self._clean_all_credentials(cont['entry'])
+            self._clean_all_credentials(cont["entry"])
 
-        for entry in cont['entry']:
-            name = entry['name']
-            data = entry['content']
-            acl = entry['acl']
+        for entry in cont["entry"]:
+            name = entry["name"]
+            data = entry["content"]
+            acl = entry["acl"]
             yield name, data, acl
 
     def _load_credentials(self, name, data):
         rest_credentials = RestCredentials(
-            self._splunkd_uri,
-            self._session_key,
-            self._endpoint
+            self._splunkd_uri, self._session_key, self._endpoint
         )
         masked = rest_credentials.decrypt(name, data)
         if masked:
@@ -373,40 +456,41 @@ class RestHandler(object):
                     self._endpoint.internal_endpoint,
                     name=name,
                 ),
-                **masked
+                **masked,
             )
 
     def _encrypt_raw_credentials(self, data):
         rest_credentials = RestCredentials(
-            self._splunkd_uri,
-            self._session_key,
-            self._endpoint
+            self._splunkd_uri, self._session_key, self._endpoint
         )
         # get clear passwords for response data and get the password change list
         change_list = rest_credentials.decrypt_all(data)
 
-        field_names = {x.name for x in self._endpoint.model(None, data).fields if x.encrypted}
+        field_names = self.get_encrypted_field_names(None)
         for model in change_list:
             # only updates the defined fields in schema
             masked = dict()
             for field in field_names:
-                if field in model['content'] and model['content'][field] != '' \
-                        and model['content'][field] != self.PASSWORD:
+                if (
+                    field in model["content"]
+                    and model["content"][field] != ""
+                    and model["content"][field] != self.PASSWORD
+                ):
                     masked[field] = self.PASSWORD
 
             if masked:
                 self._client.post(
                     self.path_segment(
                         self._endpoint.internal_endpoint,
-                        name=model['name'],
+                        name=model["name"],
                     ),
-                    body=masked
+                    body=masked,
                 )
 
     def _need_decrypt(self, name, data, decrypt):
         # some encrypted-needed fields are plain text in *.conf.
         encrypted_field = False
-        for field in self._endpoint.model(name, data).fields:
+        for field in self._endpoint.model(name).fields:
             if field.encrypted is False:
                 # ignore non-encrypted fields
                 continue
@@ -426,15 +510,17 @@ class RestHandler(object):
         return False
 
     def _clean_credentials(self, name, data):
-        encrypted_field_names = self.get_encrypted_field_names(name, data)
+        encrypted_field_names = self.get_encrypted_field_names(name)
         for field_name in encrypted_field_names:
             if field_name in data:
                 del data[field_name]
 
     def _clean_all_credentials(self, data):
-        encrypted_field_names = self.get_encrypted_field_names(None, data)
+        encrypted_field_names = self.get_encrypted_field_names(None)
         for model in data:
             for field_name in encrypted_field_names:
-                if field_name in model['content'] and model['content'][field_name] != '':
-                    model['content'][field_name] = self.PASSWORD
-
+                if (
+                    field_name in model["content"]
+                    and model["content"][field_name] != ""
+                ):
+                    model["content"][field_name] = self.PASSWORD

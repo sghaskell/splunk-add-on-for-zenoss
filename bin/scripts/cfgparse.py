@@ -140,10 +140,10 @@ class HelpFormatter:
         self.level -= 1
 
     def format_usage(self, usage):
-        raise NotImplementedError, "subclasses must implement"
+        raise NotImplementedError("subclasses must implement")
 
     def format_heading(self, heading):
-        raise NotImplementedError, "subclasses must implement"
+        raise NotImplementedError("subclasses must implement")
 
     def format_description(self, description):
         if not description:
@@ -983,9 +983,10 @@ class ConfigFilePy(ConfigFile):
         options = {}
         if self.content is None:        
             cfgfile = os.path.join(self.path,self.filename)
-            execfile(cfgfile,options)
+            with open(cfgfile) as f:
+                exec(f.read(), options)
         else:
-            exec self.get_as_str() in options
+            exec(self.get_as_str(), options)
 
         # Update the keys.  "KEYS_VARIABLE" option used to specify the
         # environment variable that holds additional default keys, if
